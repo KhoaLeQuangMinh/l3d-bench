@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+data/index.csv
+reports/
+runs/*/
+*.pth
+*.pt
+*.npy
+wandb/

@@ -1,0 +1,4 @@
+# M3: M1 + pose-balanced sampling (needs pose labels)
+model:
+  junction: false
+sampler: pose_balanced

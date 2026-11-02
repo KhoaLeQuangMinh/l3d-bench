@@ -1,0 +1,4 @@
+# M2: M1 + junction steering (rule-derived anchors)
+model:
+  junction: true
+sampler: uniform

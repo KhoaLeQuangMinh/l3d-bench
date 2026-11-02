@@ -1,0 +1,4 @@
+# M1: plain Mask2Former
+model:
+  junction: false
+sampler: uniform

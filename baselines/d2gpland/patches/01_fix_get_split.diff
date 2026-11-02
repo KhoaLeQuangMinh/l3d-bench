@@ -1,0 +1,22 @@
+diff --git a/utils/prepare_dataset.py b/utils/prepare_dataset.py
+index 721b28b..c37c1c4 100644
+--- a/utils/prepare_dataset.py
++++ b/utils/prepare_dataset.py
+@@ -10,11 +10,11 @@ def get_split(path):
+     test_file_names = []
+     sets = os.listdir(dataset_path)
+     for set in sets:
+-        if set is "Train":
+-            train_file_names = os.listdir(dataset_path / (set) / 'images')
+-        elif set is "Test":
+-            test_file_names = os.listdir(dataset_path / (set) / 'images')
+-        else:
+-            val_file_names = os.listdir(dataset_path / (set) / 'images')
++        if set == "Train":
++            train_file_names = sorted((dataset_path / set / 'images').glob('*'))
++        elif set == "Test":
++            test_file_names = sorted((dataset_path / set / 'images').glob('*'))
++        elif set == "Val":
++            val_file_names = sorted((dataset_path / set / 'images').glob('*'))
+ 
+     return train_file_names, test_file_names, val_file_names

@@ -1,0 +1,53 @@
+# Shared settings for every run. Model configs (m1/m2/m3) override only their switch.
+data:
+  roots:
+    train: /kaggle/input/datasets/khoatrytopublish/l3d-train/Train
+    val: /kaggle/input/datasets/khoatrytopublish/l3d-val/Val
+    test: /kaggle/input/datasets/khoatrytopublish/l3d-test/Test
+  index_file: data/index.csv
+  folds_file: data/splits/folds_5.json
+  pose_file: data/pose_labels.csv
+  input_size: 1024
+
+metric:                       # A2ONet's protocol, copied from a2onet/metrics.py + data/dataset.py
+  line_width_at_1080: 35      # drawn at native size with int(35 * H / 1080)
+  score_size: 1024            # label map resized (nearest) to 1024 x 1024 before scoring
+  empty_assd: 80.0
+  num_classes: 4              # background + ridge + silhouette + ligament, one class per pixel
+
+junctions:
+  connect_threshold_at_1080: 150   # native px at 1080p, scaled by H / 1080
+
+augment:
+  hflip_p: 0.5
+  scale_range: [0.8, 1.2]
+  translate_frac: 0.05
+  color_jitter: 0.15          # brightness / contrast / saturation, +-15%
+  vertical_flip: false        # never: a raised liver cannot be created by augmentation
+
+model:
+  backbone: facebook/mask2former-swin-tiny-ade-semantic
+  junction: false
+  junction_gate_init: 0.1
+  junction_loss_coord: 5.0
+  junction_loss_vis: 1.0
+
+sampler: uniform              # pose_balanced for M3
+
+train:
+  epochs: null                # frozen after the official-split pilot (Phase 4)
+  lr_backbone: 1.0e-5
+  lr_head: 1.0e-4
+  weight_decay: 1.0e-4
+  batch_size: 2
+  accumulation: 2
+  amp: true
+  num_workers: 4
+  checkpoint_every: 1
+  max_session_hours: 11.3
+  val_every: 1
+
+drive:
+  remote: gdrive
+  base_dir: l3d-bench/results
+  secret_name: RCLONE_CONFIG_GDRIVE

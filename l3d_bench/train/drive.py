@@ -1,0 +1,96 @@
+"""Google Drive sync through rclone, ported from your UNETR++ notebook (unetr.ipynb, cell 0).
+
+Same behaviour: the rclone config comes from the Kaggle secret RCLONE_CONFIG_GDRIVE (remote `gdrive`),
+single-line secrets are re-split into lines, every call retries with exponential backoff, uploads use
+128M chunks. Disabled automatically (local-only) when no config is found.
+
+Remote layout: gdrive:l3d-bench/results/<run_id>/...
+"""
+from __future__ import annotations
+
+import os
+import re
+import subprocess
+import time
+from pathlib import Path
+
+CONFIG_PATHS = ("/root/.config/rclone/rclone.conf", "/root/.rclone.conf")
+
+
+def format_rclone_config(raw: str, remote: str = "gdrive") -> str:
+    """Turn a pasted secret (possibly flattened onto one line) into a valid rclone.conf section."""
+    text = raw.strip()
+    if not text.startswith("["):
+        text = f"[{remote}]\n" + text
+    if "\n" not in text:
+        text = text.replace(f"[{remote}]", f"[{remote}]\n")
+    for key in ("type", "scope", "token", "client_id", "client_secret", "root_folder_id", "team_drive"):
+        text = re.sub(rf"[ \t]+({key}\s*=)", r"\n\1", text)
+    return text if text.endswith("\n") else text + "\n"
+
+
+class DriveSync:
+    def __init__(self, remote: str = "gdrive", base_dir: str = "l3d-bench/results",
+                 enabled: bool | None = None, runner=subprocess.run, sleep=time.sleep):
+        self.remote, self.base_dir = remote, base_dir.strip("/")
+        self._run, self._sleep = runner, sleep
+        self.enabled = self._detect() if enabled is None else enabled
+
+    # ---- setup ---------------------------------------------------------------------------------
+    @staticmethod
+    def _detect() -> bool:
+        cands = list(CONFIG_PATHS) + [os.path.expanduser("~/.config/rclone/rclone.conf")]
+        return any(Path(p).exists() for p in cands)
+
+    @classmethod
+    def from_kaggle_secret(cls, secret_name: str = "RCLONE_CONFIG_GDRIVE", **kw) -> DriveSync:
+        try:
+            from kaggle_secrets import UserSecretsClient  # only exists on Kaggle
+            raw = UserSecretsClient().get_secret(secret_name)
+        except Exception as exc:  # local runs: fall back to an existing config, else disable
+            sync = cls(**kw)
+            if not sync.enabled:
+                print(f"[drive] no secret ({exc}); results stay local")
+            return sync
+        text = format_rclone_config(raw, kw.get("remote", "gdrive"))
+        for p in CONFIG_PATHS:
+            Path(p).parent.mkdir(parents=True, exist_ok=True)
+            Path(p).write_text(text, encoding="utf-8")
+        return cls(enabled=True, **kw)
+
+    # ---- primitives ----------------------------------------------------------------------------
+    def remote_path(self, run_id: str, name: str = "") -> str:
+        tail = f"{self.base_dir}/{run_id}" + (f"/{name}" if name else "")
+        return f"{self.remote}:{tail}"
+
+    def _exec(self, args: list[str], attempts: int = 5, backoff: float = 5.0) -> bool:
+        if not self.enabled:
+            return False
+        for attempt in range(1, attempts + 1):
+            res = self._run(["rclone"] + args, capture_output=True, text=True)
+            if res.returncode == 0:
+                return True
+            print(f"[drive] attempt {attempt}/{attempts} failed: {res.stderr.strip()[:120]}")
+            if attempt < attempts:
+                self._sleep(backoff)
+                backoff *= 2.0
+        return False
+
+    def push_file(self, local: str | Path, run_id: str) -> bool:
+        if not Path(local).exists():
+            return False
+        return self._exec(["copy", str(local), self.remote_path(run_id),
+                           "--drive-chunk-size", "128M", "--drive-upload-cutoff", "128M"])
+
+    def push_dir(self, local_dir: str | Path, run_id: str) -> bool:
+        return self._exec(["copy", str(local_dir), self.remote_path(run_id), "--drive-chunk-size", "128M"])
+
+    def pull_file(self, run_id: str, name: str, local_dir: str | Path) -> bool:
+        return self._exec(["copy", self.remote_path(run_id, name), str(local_dir), "--drive-chunk-size", "128M"])
+
+    def exists(self, run_id: str, name: str) -> bool:
+        if not self.enabled:
+            return False
+        res = self._run(["rclone", "lsf", self.remote_path(run_id), "--include", name],
+                        capture_output=True, text=True)
+        return res.returncode == 0 and name in res.stdout

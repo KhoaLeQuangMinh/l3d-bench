@@ -1,0 +1,13 @@
+diff --git a/test.py b/test.py
+index f58ceec..387a567 100644
+--- a/test.py
++++ b/test.py
+@@ -23,7 +23,7 @@ def main(args):
+         model_checkpoint = torch.load(args.model_path)
+         model.load_state_dict(model_checkpoint['model'])
+ 
+-    model.train()
++    model.eval()
+     with torch.no_grad():
+         pbar = tqdm(val_loader)
+         ious = []
