@@ -9,3 +9,6 @@ runs/*/
 *.pt
 *.npy
 wandb/
+# never commit Google credentials (this repo is public)
+rclone.conf
+*.conf

@@ -141,3 +141,18 @@ def test_disabled_is_noop(tmp_path):
     f = tmp_path / "f.txt"
     f.write_text("x")
     assert sync.push_file(f, "r") is False and sync.exists("r", "f.txt") is False
+
+
+def test_config_from_secret(tmp_path):
+    target = tmp_path / "home" / "rclone.conf"
+    flat = 'type = drive scope = drive token = {"access_token":"x"}'   # Kaggle secrets may arrive flattened
+    sync = DriveSync.from_kaggle(get_secret=lambda name: flat if name == "RCLONE_CONFIG_GDRIVE" else None,
+                                 targets=(str(target),))
+    assert sync.enabled and target.read_text().startswith("[gdrive]\n")
+    assert (target.stat().st_mode & 0o777) == 0o600
+
+
+def test_missing_secret_disables(tmp_path, monkeypatch):
+    monkeypatch.setattr(DriveSync, "_detect", staticmethod(lambda: False))
+    sync = DriveSync.from_kaggle(get_secret=lambda name: "", targets=(str(tmp_path / "c.conf"),))
+    assert not sync.enabled and not (tmp_path / "c.conf").exists()

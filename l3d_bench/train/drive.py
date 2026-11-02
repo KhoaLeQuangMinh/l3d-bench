@@ -1,8 +1,10 @@
 """Google Drive sync through rclone, ported from your UNETR++ notebook (unetr.ipynb, cell 0).
 
-Same behaviour: the rclone config comes from the Kaggle secret RCLONE_CONFIG_GDRIVE (remote `gdrive`),
-single-line secrets are re-split into lines, every call retries with exponential backoff, uploads use
-128M chunks. Disabled automatically (local-only) when no config is found.
+Same behaviour: remote `gdrive`, single-line configs are re-split into lines, every call retries with
+exponential backoff, uploads use 128M chunks. Disabled automatically (local-only) when no config is found.
+
+The config (it holds a Google refresh token) must never be committed: this repo is public. On Kaggle it is
+read from the account's secret RCLONE_CONFIG_GDRIVE (Add-ons > Secrets), the same as the UNETR++ notebook.
 
 Remote layout: gdrive:l3d-bench/results/<run_id>/...
 """
@@ -42,21 +44,37 @@ class DriveSync:
         cands = list(CONFIG_PATHS) + [os.path.expanduser("~/.config/rclone/rclone.conf")]
         return any(Path(p).exists() for p in cands)
 
-    @classmethod
-    def from_kaggle_secret(cls, secret_name: str = "RCLONE_CONFIG_GDRIVE", **kw) -> DriveSync:
-        try:
-            from kaggle_secrets import UserSecretsClient  # only exists on Kaggle
-            raw = UserSecretsClient().get_secret(secret_name)
-        except Exception as exc:  # local runs: fall back to an existing config, else disable
-            sync = cls(**kw)
-            if not sync.enabled:
-                print(f"[drive] no secret ({exc}); results stay local")
-            return sync
-        text = format_rclone_config(raw, kw.get("remote", "gdrive"))
-        for p in CONFIG_PATHS:
+    @staticmethod
+    def _install(raw: str, remote: str, targets=CONFIG_PATHS) -> None:
+        text = format_rclone_config(raw, remote)
+        for p in targets:
             Path(p).parent.mkdir(parents=True, exist_ok=True)
             Path(p).write_text(text, encoding="utf-8")
-        return cls(enabled=True, **kw)
+            os.chmod(p, 0o600)
+
+    @classmethod
+    def from_kaggle(cls, secret_name: str = "RCLONE_CONFIG_GDRIVE", targets=CONFIG_PATHS,
+                    get_secret=None, **kw) -> DriveSync:
+        """Install the rclone config from the Kaggle secret, so it never lives in the (public) repo.
+        Falls back to a config already on the machine; otherwise sync is disabled and results stay local."""
+        remote = kw.get("remote", "gdrive")
+        try:
+            if get_secret is None:
+                from kaggle_secrets import UserSecretsClient  # only exists on Kaggle
+                get_secret = UserSecretsClient().get_secret
+            raw = get_secret(secret_name)
+            if not raw or not raw.strip():
+                raise ValueError("secret is empty")
+            cls._install(raw, remote, targets)
+            return cls(enabled=True, **kw)
+        except Exception as exc:  # noqa: BLE001 - any failure means "no secret here"
+            sync = cls(**kw)
+            if not sync.enabled:
+                print(f"[drive] secret {secret_name} not available ({type(exc).__name__}): "
+                      "turn it on under Add-ons > Secrets. Results stay local.")
+            return sync
+
+    from_kaggle_secret = from_kaggle  # old name
 
     # ---- primitives ----------------------------------------------------------------------------
     def remote_path(self, run_id: str, name: str = "") -> str:

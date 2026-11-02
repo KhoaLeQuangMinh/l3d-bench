@@ -30,7 +30,7 @@ tests/              synthetic L3D fixtures; reference copy of A2ONet's metric as
 
 ## First steps on Kaggle (G0 + G1)
 
-1. Attach `khoatrytopublish/l3d-train`, `l3d-val`, `l3d-test`; add secrets `GH_TOKEN`, `RCLONE_CONFIG_GDRIVE`.
+1. Attach `khoatrytopublish/l3d-train`, `l3d-val`, `l3d-test`. Under Add-ons > Secrets, add `RCLONE_CONFIG_GDRIVE` (the full `[gdrive]` rclone config of the lab Google account) and switch it on for the notebook. Never put that config in the repo or a notebook: this repo is public.
 2. Run `notebooks/phase1_data_checks.ipynb`. It writes `data/index.csv` and `reports/g1/` and syncs them to Drive.
 3. Check the overlays by eye and fill in `docs/gates.md`.
 
