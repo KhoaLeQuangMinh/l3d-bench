@@ -2,7 +2,8 @@
 
 Runs from inside the TopoNet repo (cwd), with its own dataset class, so preprocessing is exactly the released
 test.py: cv2 resize to 1024, ToTensor, argmax over 4 classes. Its native metric (pooled Dice; medpy ASSD on
-the 3 class masks, 80 when the prediction is empty) is computed on its own ground truth (35 px fixed,
+the 3 class masks, 80 when the prediction is empty, as test.py; and the per-class surface-distance ASSD of its
+train.py validation loop as assd_trainpy) is computed on its own ground truth (35 px fixed,
 4K canvas chosen by path substring) and written to --native_json, to compare with the paper.
 
     python export_predictions.py --model_path best_val_model.pth --depth_path vitb.pth --list frames.txt --out preds/
@@ -16,6 +17,8 @@ import cv2
 import numpy as np
 import torch
 from medpy.metric import assd
+import surface_distance
+from surface_distance import metrics as sd_metrics
 from torch.utils.data import DataLoader
 
 sys.path.insert(0, os.getcwd())
@@ -56,8 +59,19 @@ def main():
                 dist = float("nan")
             else:
                 dist = float(assd(pred[1:], gt[1:]))
-            rows.append({"frame_id": stem, "dice": float(dice), "iou": float(iou), "assd": dist})
-    summary = {k: float(np.nanmean([r[k] for r in rows])) for k in ("dice", "iou", "assd")}
+            # ASSD as train.py's validation loop computes it: surface-distance per class, mean of the 3 classes,
+            # 80 if the prediction is empty or the mean is >= 500 (a class missing on either side gives inf)
+            if np.count_nonzero(pred[1:]) == 0:
+                dist_train = 80.0
+            else:
+                per_class = []
+                for i in range(3):
+                    sd = sd_metrics.compute_surface_distances(gt[i + 1].astype(bool), pred[i + 1].astype(bool), (1.0, 1.0))
+                    per_class.append(surface_distance.compute_average_surface_distance(sd)[1])
+                dist_train = float(np.mean(per_class)) if np.mean(per_class) < 500 else 80.0
+            rows.append({"frame_id": stem, "dice": float(dice), "iou": float(iou), "assd": dist,
+                         "assd_trainpy": dist_train})
+    summary = {k: float(np.nanmean([r[k] for r in rows])) for k in ("dice", "iou", "assd", "assd_trainpy")}
     json.dump({"metric": "TopoNet test.py (its own GT)", "mean": summary, "frames": rows}, open(a.native_json, "w"), indent=1)
     print(json.dumps(summary))
 

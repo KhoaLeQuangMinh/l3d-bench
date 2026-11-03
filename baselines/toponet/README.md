@@ -16,6 +16,11 @@ Patches (patches/):
   val folder with the repo's own evaluation code; `epochs.jsonl` log; L3D_BATCH_SIZE / L3D_MAX_EPOCHS (pilot)
   read from the environment. The released `best_model_path.pth` (selected on test) is still written.
 
+- 02_memory_only.diff — memory only, same values: the frozen Depth Anything V2 ViT-B (run under no_grad, no
+  batch-dependent layers) now processes one image at a time. At batch 4 its 5330-token attention needs two 5 GB
+  tensors and ran out of memory on a 16 GB T4 (pilot, 3 Nov). Checked: batch vs per-image outputs differ by
+  1e-16 in float64, in train mode (TopoNet's model.train() also switches the depth encoder to train mode).
+
 Setup: Betti-Matching-3D built from source at 50d7379 (Sept 2024; its 2026 commit changed the API) into
 `betti_match/Betti_Matching/betti_build`, the import path train.py expects; Depth Anything V2 ViT-B from Hugging
 Face; ImageNet ResNet-34 downloaded by the code; surface-distance from GitHub.

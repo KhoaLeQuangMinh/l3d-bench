@@ -1,0 +1,15 @@
+diff --git a/models/TopoNet.py b/models/TopoNet.py
+index 73d1aee..7a4bc2b 100644
+--- a/models/TopoNet.py
++++ b/models/TopoNet.py
+@@ -146,7 +146,9 @@ class TopoNet(nn.Module):
+ 
+     def forward(self, image):
+         original_depth = F.interpolate(image, size=(1022, 1022), mode='area')
+-        original_depth = self.depth_encoder.infer_image(original_depth)
++        # [l3d-bench] memory only: the frozen Depth Anything ViT-B (no gradients, no batch-dependent layers) runs one
++        # image at a time; at batch 4 its 5330-token attention needs 2 x 5 GB and does not fit a 16 GB T4. Same values.
++        original_depth = torch.cat([self.depth_encoder.infer_image(d.unsqueeze(0)) for d in original_depth], dim=0)
+ 
+         original_depth = original_depth.expand(-1, 3, -1, -1)
+ 
