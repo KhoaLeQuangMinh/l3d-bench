@@ -35,7 +35,11 @@ model:
 sampler: uniform              # pose_balanced for M3
 
 train:
-  epochs: null                # frozen after the official-split pilot (Phase 4)
+  epochs: 50                  # pilot value; frozen after the official-split pilot (Phase 4)
+  scheduler: cosine           # per epoch, as Exp 2 / Exp 8
+  eta_min: 1.0e-6
+  clip_grad_norm: 5.0         # Exp 8
+  eval_batch_size: 2
   lr_backbone: 1.0e-5
   lr_head: 1.0e-4
   weight_decay: 1.0e-4
@@ -45,7 +49,7 @@ train:
   num_workers: 4
   checkpoint_every: 1
   max_session_hours: 11.3
-  val_every: 1
+  final_reserve_hours: 0.4    # time kept for exporting and scoring after the last epoch
 
 drive:
   remote: gdrive

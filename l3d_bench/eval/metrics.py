@@ -52,3 +52,14 @@ def score_frame(pred: np.ndarray, gt: np.ndarray) -> dict[str, float]:
     row = {"dice": dice, "iou": iou, "assd": dist, "assd_empty_penalty": float(penalty)}
     row.update(per_class_dice(pred, gt))
     return row
+
+
+def a2onet_dice_torch(pred, gt):
+    """Batched GPU version of the A2ONet Dice, used only for checkpoint selection during training.
+
+    pred, gt: (B, H, W) integer label maps. With one class per pixel, |P| = #(pred > 0), |G| = #(gt > 0) and
+    |P & G| = #(pred == gt > 0), so this equals a2onet_metrics()[0] exactly (tested)."""
+    p = (pred > 0).flatten(1).sum(1).double()
+    g = (gt > 0).flatten(1).sum(1).double()
+    inter = ((pred == gt) & (gt > 0)).flatten(1).sum(1).double()
+    return (2 * inter + SMOOTH) / (p + g + SMOOTH)

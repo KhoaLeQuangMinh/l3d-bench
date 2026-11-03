@@ -58,7 +58,12 @@ class L3DDataset(Dataset):
             raise ValueError("vertical flips are not allowed (they would fake raised-liver views)")
         self.train = train
         self.poses = poses or {}
-        self.rng = random.Random(seed)
+        self.seed, self.epoch = seed, 0
+
+    def set_epoch(self, epoch: int) -> None:
+        """Augmentation of item i in epoch e depends only on (seed, e, i): identical after a resume and
+        independent of the number of DataLoader workers."""
+        self.epoch = epoch
 
     def __len__(self) -> int:
         return len(self.rows)
@@ -76,8 +81,8 @@ class L3DDataset(Dataset):
         coords, vis = derive_junctions(ann, self.jthr)
         return fid, img, label, coords, vis
 
-    def augment(self, img, label, coords, vis):
-        a, rng, s = self.aug, self.rng, self.size
+    def augment(self, img, label, coords, vis, rng: random.Random):
+        a, s = self.aug, self.size
         if rng.random() < a.get("hflip_p", 0.0):
             img, label = img[:, ::-1].copy(), label[:, ::-1].copy()
             coords, vis = hflip_junctions(coords, vis)
@@ -100,7 +105,8 @@ class L3DDataset(Dataset):
     def __getitem__(self, i: int):
         fid, img, label, coords, vis = self.load(i)
         if self.train:
-            img, label, coords, vis = self.augment(img, label, coords, vis)
+            rng = random.Random((self.seed * 1_000_003 + self.epoch) * 1_000_003 + i)
+            img, label, coords, vis = self.augment(img, label, coords, vis, rng)
         item = {
             "image": img.transpose(2, 0, 1).astype(np.float32) / 255.0,
             "label": label.astype(np.int64),
