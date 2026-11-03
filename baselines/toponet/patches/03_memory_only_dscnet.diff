@@ -1,0 +1,22 @@
+diff --git a/models/TopoNet.py b/models/TopoNet.py
+index 7a4bc2b..fb382b9 100644
+--- a/models/TopoNet.py
++++ b/models/TopoNet.py
+@@ -152,7 +152,16 @@ class TopoNet(nn.Module):
+ 
+         original_depth = original_depth.expand(-1, 3, -1, -1)
+ 
+-        d0, d1, d2, d3, original_depth = self.dsc_encoder(original_depth)
++        if torch.is_grad_enabled():
++            # [l3d-bench] memory only: the trainable DSCNet encoder works at full 1024 x 1024 resolution and its
++            # activations for 4 images do not fit a 16 GB T4. It has only per-image layers (GroupNorm, no dropout,
++            # no randomness), so we run it one image at a time with activation checkpointing: same outputs, same
++            # gradients, recomputed in the backward pass.
++            from torch.utils.checkpoint import checkpoint
++            parts = [checkpoint(self.dsc_encoder, d.unsqueeze(0), use_reentrant=False) for d in original_depth]
++            d0, d1, d2, d3, original_depth = (torch.cat(t, dim=0) for t in zip(*parts))
++        else:
++            d0, d1, d2, d3, original_depth = self.dsc_encoder(original_depth)
+         out = self.encoder.forward_first_conv(image)
+         skipf0, out_f0 = self.be0(out, F.interpolate(d0, size=(512, 512), mode='area'))
+         out = F.max_pool2d(out, kernel_size=3, stride=2, padding=1)

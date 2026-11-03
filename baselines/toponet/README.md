@@ -20,6 +20,11 @@ Patches (patches/):
   batch-dependent layers) now processes one image at a time. At batch 4 its 5330-token attention needs two 5 GB
   tensors and ran out of memory on a 16 GB T4 (pilot, 3 Nov). Checked: batch vs per-image outputs differ by
   1e-16 in float64, in train mode (TopoNet's model.train() also switches the depth encoder to train mode).
+- 03_memory_only_dscnet.diff — memory only, same values and gradients: with 02 in place, the next out-of-memory
+  was the trainable DSCNet encoder at 1024 x 1024 (13.5 GB for 4 images). It has only per-image layers
+  (GroupNorm, no dropout or randomness), so during training it runs one image at a time with activation
+  checkpointing. Checked in float64: outputs differ by 4e-14, gradients of all 120 parameter tensors by 6e-14
+  (relative).
 
 Setup: Betti-Matching-3D built from source at 50d7379 (Sept 2024; its 2026 commit changed the API) into
 `betti_match/Betti_Matching/betti_build`, the import path train.py expects; Depth Anything V2 ViT-B from Hugging
