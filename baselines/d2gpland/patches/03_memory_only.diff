@@ -1,0 +1,44 @@
+diff --git a/models/D2GPLand.py b/models/D2GPLand.py
+index edbcd6d..7c12a25 100644
+--- a/models/D2GPLand.py
++++ b/models/D2GPLand.py
+@@ -8,6 +8,7 @@ from models.context_modules import get_context_module
+ from models.model_utils import ConvBNAct, Swish, Hswish, SqueezeAndExcitation
+ from models.decoder import Decoder
+ from segment_anything import sam_model_registry
++from torch.utils.checkpoint import checkpoint
+ 
+ 
+ class Edge_Prototypes(nn.Module):
+@@ -320,7 +321,14 @@ class D2GPLand(nn.Module):
+         original_depth = F.interpolate(depth, size=(1024, 1024), mode='area')
+ 
+         original_depth = self.first_conv(original_depth)
+-        original_depth = self.sam_encoder(original_depth)
++        if torch.is_grad_enabled():
++            # [l3d-bench] memory only: the frozen SAM encoder sits after a trainable layer, so training keeps all of
++            # its activations for the whole batch (does not fit a 16 GB T4 at batch 4). Run it one image at a time
++            # with activation checkpointing: same outputs and same gradients, recomputed in the backward pass.
++            original_depth = torch.cat([checkpoint(self.sam_encoder, d.unsqueeze(0), use_reentrant=False)
++                                        for d in original_depth], dim=0)
++        else:
++            original_depth = self.sam_encoder(original_depth)
+         out = self.encoder.forward_first_conv(image)
+         out = self.se_layer0(out)
+         out = F.max_pool2d(out, kernel_size=3, stride=2, padding=1)
+diff --git a/utils/metrics.py b/utils/metrics.py
+index 3e9a431..726c937 100644
+--- a/utils/metrics.py
++++ b/utils/metrics.py
+@@ -25,8 +25,9 @@ class contrastive_loss(nn.Module):
+         class_embs = None
+         for cls_id in range(prototypes.shape[0]):
+             mask = y_batch[:, cls_id + 1, :, :]
+-            mask = torch.stack([mask for _ in range(feature.shape[1])], dim=1)
+-            mask = F.interpolate(mask, size=64, mode="bilinear")
++            # [l3d-bench] memory only: resize one channel, then repeat it, instead of resizing 256 identical
++            # copies at 1024 x 1024 (a 4.3 GB tensor at batch 4). Bilinear resizing is per channel: same values.
++            mask = F.interpolate(mask.unsqueeze(1), size=64, mode="bilinear").expand(-1, feature.shape[1], -1, -1)
+             class_emb = feature * mask
+             class_emb = F.interpolate(class_emb, size=16, mode="bilinear")
+             class_emb = class_emb.mean(1).reshape(-1, 16 * 16)

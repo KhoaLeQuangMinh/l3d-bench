@@ -20,8 +20,14 @@ Patches (patches/):
   `best_val_model_path.pth` / `best_val_prototype_path.pth` chosen by Dice on the val folder with the repo's own
   evaluation code; `epochs.jsonl`; L3D_MAX_EPOCHS for the pilot.
 
+- 03_memory_only.diff — memory only, same values and gradients: the frozen SAM encoder sits behind a trainable
+  1x1 conv, so training stores all SAM activations for 4 images (out of memory on a 16 GB T4, pilot 3 Nov). SAM
+  now runs one image at a time with activation checkpointing during training; the contrastive loss resizes one
+  mask channel and repeats it instead of resizing 256 identical copies. Checked: identical outputs and
+  gradients in float64 (float32 differs only by rounding), identical mask values.
+
 Batch size must stay 4: the contrastive loss hard-codes ref_labels for 4 images (12 = 3 classes x 4). It also
-builds a (4, 256, 1024, 1024) float mask per class (~4.3 GB), so watch GPU memory in the pilot.
+built a (4, 256, 1024, 1024) float mask per class (~4.3 GB); patch 03 removes that.
 SAM-b is read from the fixed path `sam_path/sam_vit_b_01ec64.pth` inside the repo (linked by the runner).
 
 How it runs: `python -m l3d_bench.baselines.run --method d2gpland --split <official|fK>` (notebook:
