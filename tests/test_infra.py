@@ -156,3 +156,28 @@ def test_missing_secret_disables(tmp_path, monkeypatch):
     monkeypatch.setattr(DriveSync, "_detect", staticmethod(lambda: False))
     sync = DriveSync.from_kaggle(get_secret=lambda name: "", targets=(str(tmp_path / "c.conf"),))
     assert not sync.enabled and not (tmp_path / "c.conf").exists()
+
+
+def test_async_uploads_ordered_deduped(tmp_path):
+    import threading
+    uploaded, gate = [], threading.Event()
+
+    def runner(cmd, **kw):
+        gate.wait(5)
+        uploaded.append((Path(cmd[2]).name.split(".")[0], cmd[3].rsplit("/", 1)[1], Path(cmd[2]).read_text()))
+        return SimpleNamespace(returncode=0, stderr="", stdout="")
+    sync = DriveSync(enabled=True, runner=runner, sleep=lambda s: None)
+    best, latest = tmp_path / "best.pth", tmp_path / "checkpoint_latest.pth"
+    for epoch in (1, 2, 3):
+        latest.write_text(f"latest{epoch}")
+        if epoch != 2:
+            best.write_text(f"best{epoch}")
+            sync.push_file_async(best, "r")
+        sync.push_file_async(latest, "r")
+    gate.set()
+    assert sync.wait(10)
+    names = [u[1] for u in uploaded]
+    # first upload may be anything already started; after that best always precedes its checkpoint
+    assert names[-2:] == ["best.pth", "checkpoint_latest.pth"]
+    assert uploaded[-1][2] == "latest3" and uploaded[-2][2] == "best3"
+    assert len(uploaded) <= 4 and not list((tmp_path / ".upload").iterdir())

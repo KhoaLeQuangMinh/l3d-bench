@@ -1,0 +1,84 @@
+diff --git a/train.py b/train.py
+index 4ddc8af..a053390 100644
+--- a/train.py
++++ b/train.py
+@@ -3,6 +3,7 @@ import json
+ import logging
+ import os
+ import random
++import sys
+ 
+ import numpy as np
+ import torch
+@@ -111,6 +112,14 @@ def make_eval_loader(files, args, rank=0, world_size=1):
+     return DataLoader(ds, batch_size=1, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+ 
+ 
++def _l3d_save_resume(path, **state):
++    # [l3d-bench] atomic resume checkpoint, written after every epoch
++    state["rng"] = {"python": random.getstate(), "numpy": np.random.get_state(), "torch": torch.get_rng_state(),
++                    "cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None}
++    torch.save(state, path + ".tmp")
++    os.replace(path + ".tmp", path)
++
++
+ def train(args):
+     distributed, rank, world_size, local_rank = init_distributed()
+     set_seed(args.seed)
+@@ -149,7 +158,27 @@ def train(args):
+     best_val_dice = -1.0
+     history = []
+ 
+-    for epoch in range(args.epochs):
++    # [l3d-bench] resume across Kaggle sessions; stop cleanly before the session limit (single GPU only)
++    import time as _time
++    n_epochs = min(args.epochs, int(os.environ.get("L3D_MAX_EPOCHS", args.epochs)))
++    stop_at = float(os.environ.get("L3D_STOP_AT", "inf"))
++    resume_path = os.path.join(args.save_dir, "resume.pth")
++    start_epoch, slowest = 0, 0.0
++    if os.path.exists(resume_path):
++        ck = torch.load(resume_path, map_location=device, weights_only=False)
++        unwrap(model).load_state_dict(ck["model"])
++        optimizer.load_state_dict(ck["optimizer"])
++        scheduler.load_state_dict(ck["scheduler"])
++        start_epoch, best, best_val_dice, history, slowest = (ck["epoch"] + 1, ck["best"], ck["best_val_dice"],
++                                                              ck["history"], ck["slowest"])
++        random.setstate(ck["rng"]["python"]); np.random.set_state(ck["rng"]["numpy"])
++        torch.set_rng_state(ck["rng"]["torch"].cpu())
++        if ck["rng"]["cuda"] is not None and torch.cuda.is_available():
++            torch.cuda.set_rng_state_all([t.cpu() for t in ck["rng"]["cuda"]])
++        log.info("[l3d-bench] resumed after epoch {}".format(ck["epoch"]))
++
++    for epoch in range(start_epoch, n_epochs):
++        t_epoch = _time.time()
+         alpha = criterion.fusion_alpha(epoch)
+         unwrap(model).set_fusion_alpha(alpha)
+         log.info(f"epoch [{epoch}/{args.epochs}] fusion alpha={alpha:.3f} lr={optimizer.param_groups[0]['lr']:.2e}")
+@@ -177,7 +206,7 @@ def train(args):
+             dist.all_reduce(sums, op=dist.ReduceOp.AVG)
+         log.info('epoch [{}/{}] loss:{:.4f} seg:{:.4f} curve:{:.4f} illum:{:.4f}'.format(epoch, args.epochs, *sums.tolist()))
+ 
+-        is_last = epoch == args.epochs - 1
++        is_last = epoch == n_epochs - 1
+         if epoch % args.val_interval == 0 or is_last:
+             if is_main_process():
+                 torch.save({
+@@ -230,6 +259,18 @@ def train(args):
+ 
+         scheduler.step()
+ 
++        # [l3d-bench] resume checkpoint + time guard
++        slowest = max(slowest, _time.time() - t_epoch)
++        if is_main_process():
++            _l3d_save_resume(resume_path, model=unwrap(model).state_dict(), optimizer=optimizer.state_dict(),
++                             scheduler=scheduler.state_dict(), epoch=epoch, best=best, best_val_dice=best_val_dice,
++                             history=history, slowest=slowest)
++        if not distributed and epoch + 1 < n_epochs and _time.time() + 1.15 * slowest > stop_at:
++            log.info("[l3d-bench] session time limit: paused after epoch {}".format(epoch))
++            sys.exit(3)
++
++    if is_main_process():
++        open(os.path.join(args.save_dir, "TRAINING_DONE"), "w").write("done\n")
+     if distributed:
+         dist.destroy_process_group()
+     return best

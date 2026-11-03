@@ -10,9 +10,11 @@ Remote layout: gdrive:l3d-bench/results/<run_id>/...
 """
 from __future__ import annotations
 
+import itertools
 import os
 import re
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -37,6 +39,14 @@ class DriveSync:
         self.remote, self.base_dir = remote, base_dir.strip("/")
         self._run, self._sleep = runner, sleep
         self.enabled = self._detect() if enabled is None else enabled
+        # background uploads: one worker, in order, newest copy of each file wins
+        self._pending: dict[tuple[str, str], Path] = {}
+        self._order: list[tuple[str, str]] = []
+        self._cv = threading.Condition()
+        self._worker: threading.Thread | None = None
+        self._busy = False
+        self._counter = itertools.count()
+        self.failed: list[str] = []
 
     # ---- setup ---------------------------------------------------------------------------------
     @staticmethod
@@ -99,6 +109,66 @@ class DriveSync:
             return False
         return self._exec(["copy", str(local), self.remote_path(run_id),
                            "--drive-chunk-size", "128M", "--drive-upload-cutoff", "128M"])
+
+    # ---- background uploads ------------------------------------------------------------------
+    def push_file_async(self, local: str | Path, run_id: str) -> bool:
+        """Queue an upload and return at once. A hard link freezes the file's current content, so the caller
+        may overwrite the file right away. If an older copy of the same file is still waiting, only the
+        newest is uploaded. Files go up in the order of their latest request, so a checkpoint never reaches
+        Drive before the best.pth it refers to."""
+        local = Path(local)
+        if not self.enabled or not local.exists():
+            return False
+        stage_dir = local.parent / ".upload"
+        stage_dir.mkdir(exist_ok=True)
+        snap = stage_dir / f"{local.name}.{next(self._counter)}"
+        try:
+            os.link(local, snap)
+        except OSError:
+            import shutil
+            shutil.copy2(local, snap)
+        key = (run_id, local.name)
+        with self._cv:
+            old = self._pending.get(key)
+            self._pending[key] = snap
+            if old is not None:
+                self._order.remove(key)
+            self._order.append(key)            # order of the latest request: best.pth stays before checkpoint
+            if self._worker is None or not self._worker.is_alive():
+                self._worker = threading.Thread(target=self._drain, daemon=True)
+                self._worker.start()
+            self._cv.notify_all()
+        if old is not None:
+            old.unlink(missing_ok=True)
+        return True
+
+    def _drain(self) -> None:
+        while True:
+            with self._cv:
+                if not self._order:
+                    self._busy = False
+                    self._cv.notify_all()
+                    return
+                key = self._order.pop(0)
+                snap = self._pending.pop(key)
+                self._busy = True
+            run_id, name = key
+            ok = self._exec(["copyto", str(snap), self.remote_path(run_id, name),
+                             "--drive-chunk-size", "128M", "--drive-upload-cutoff", "128M"])
+            if not ok:
+                self.failed.append(name)
+            snap.unlink(missing_ok=True)
+
+    def wait(self, timeout: float | None = None) -> bool:
+        """Block until every queued upload is finished. Returns False on timeout."""
+        end = None if timeout is None else time.monotonic() + timeout
+        with self._cv:
+            while self._order or self._busy:
+                left = None if end is None else end - time.monotonic()
+                if left is not None and left <= 0:
+                    return False
+                self._cv.wait(left)
+        return True
 
     def push_dir(self, local_dir: str | Path, run_id: str) -> bool:
         return self._exec(["copy", str(local_dir), self.remote_path(run_id), "--drive-chunk-size", "128M"])

@@ -56,8 +56,11 @@ def overfit(cfg: dict, index, n_frames: int = 10, steps: int = 300, device: str 
     model.train()
     while step < steps:
         for b in loader:
+            extra = {}
+            if getattr(model, "uses_junctions", False):
+                extra = {"junctions": b["junctions"].to(dev), "junction_vis": b["junction_vis"].to(dev)}
             with torch.autocast(dev.type, dtype=torch.float16, enabled=amp):
-                loss = model(b["image"].to(dev), b["label"].to(dev)).loss
+                loss = model(b["image"].to(dev), b["label"].to(dev), **extra).loss
             opt.zero_grad(set_to_none=True)
             scaler.scale(loss).backward()
             scaler.unscale_(opt)
@@ -83,8 +86,9 @@ def main():
     ap.add_argument("--steps", type=int, default=300)
     ap.add_argument("--frames", type=int, default=10)
     ap.add_argument("--target", type=float, default=0.8)
+    ap.add_argument("--method", default="m1", choices=["m1", "m2"])
     args = ap.parse_args()
-    cfg = load_config(REPO_ROOT / "configs" / "m1.yaml")
+    cfg = load_config(REPO_ROOT / "configs" / f"{args.method}.yaml")
     hist = overfit(cfg, build_index(cfg["data"]["roots"]), args.frames, args.steps)
     final = hist[-1]["dice"]
     print(f"\noverfit Dice {final:.4f} after {args.steps} steps -> {'PASS' if final >= args.target else 'FAIL'}"

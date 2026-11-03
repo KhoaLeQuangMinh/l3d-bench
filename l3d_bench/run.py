@@ -199,6 +199,7 @@ def run(run_id: str, cfg: dict, out_root: str | Path, *, drive=None, index=None,
     (run_dir / "DONE").write_text(time.strftime("%Y-%m-%d %H:%M:%S"))
     if drive is not None and drive.enabled:
         trainer._push("train.log", "history.csv", "DONE")
+        trainer.wait_uploads()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     return {"status": "done", "best": best, **results}

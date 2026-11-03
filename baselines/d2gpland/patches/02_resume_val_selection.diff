@@ -1,0 +1,120 @@
+diff --git a/train.py b/train.py
+index d2b60c2..fb148a8 100644
+--- a/train.py
++++ b/train.py
+@@ -1,5 +1,9 @@
+ import argparse
+ import os
++import random
++import sys
++import time
++import json
+ 
+ import numpy as np
+ import torch
+@@ -14,6 +18,31 @@ from utils.dataset import LandmarkDataset
+ from models.D2GPLand import D2GPLand, Edge_Prototypes
+ 
+ 
++def _l3d_val_dice(model, edge_prototypes_model, loader, device):
++    # [l3d-bench] Dice on the val folder with the same evaluation code as the released val loop
++    model.eval()
++    edge_prototypes_model.eval()
++    dices = []
++    with torch.no_grad():
++        for X_batch, depth, y_batch, name in loader:
++            prototypes = edge_prototypes_model()
++            output, feature, edge_out = model(X_batch.to(device), depth.to(device), prototypes)
++            tmp = torch.argmax(torch.softmax(output, dim=1), dim=1)[0].cpu().numpy()
++            tmp2 = torch.argmax(y_batch, dim=1)[0].numpy()
++            pred = np.array([tmp == i for i in range(4)]).astype(np.uint8)
++            gt = np.array([tmp2 == i for i in range(4)]).astype(np.uint8)
++            dices.append(evaluation(pred[1:].flatten(), gt[1:].flatten())[1])
++    return float(np.mean(dices))
++
++
++def _l3d_save_resume(path, **state):
++    # [l3d-bench] atomic resume checkpoint, written after every epoch
++    state["rng"] = {"python": random.getstate(), "numpy": np.random.get_state(), "torch": torch.get_rng_state(),
++                    "cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None}
++    torch.save(state, path + ".tmp")
++    os.replace(path + ".tmp", path)
++
++
+ def main(save_path, args):
+     train_file, test_file, val_file = prepare_dataset.get_split(args.data_path)
+     train_transform = T.Compose([
+@@ -28,6 +57,10 @@ def main(save_path, args):
+     val_dataset = LandmarkDataset(test_file, transform=val_transform, mode='val')
+     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
+     val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
++    # [l3d-bench] additional selection on the val folder (the released code selects on test)
++    l3d_val_loader = DataLoader(LandmarkDataset(val_file, transform=val_transform, mode='val'), batch_size=1,
++                                shuffle=False) if len(val_file) else None
++    out_dir = os.environ.get("L3D_SAVE_DIR", ".")   # [l3d-bench] released code writes to the working directory
+ 
+     device = torch.device("cuda")
+     bce_loss = torch.nn.BCEWithLogitsLoss()
+@@ -42,7 +75,26 @@ def main(save_path, args):
+                                   ], lr=args.lr, weight_decay=args.weight_decay)
+     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epoch, args.decay_lr)
+ 
+-    for epoch in range(args.epoch):
++    # [l3d-bench] resume across Kaggle sessions; stop cleanly before the session limit
++    n_epochs = min(args.epoch, int(os.environ.get("L3D_MAX_EPOCHS", args.epoch)))
++    stop_at = float(os.environ.get("L3D_STOP_AT", "inf"))
++    resume_path = os.path.join(out_dir, "resume.pth")
++    start_epoch, best_val_dice, slowest = 0, -100, 0.0
++    if os.path.exists(resume_path):
++        ck = torch.load(resume_path, map_location=device, weights_only=False)
++        model.load_state_dict(ck["model"])
++        edge_prototypes_model.load_state_dict(ck["prototypes"])
++        optimizer.load_state_dict(ck["optimizer"])
++        scheduler.load_state_dict(ck["scheduler"])
++        start_epoch, best_dice, best_val_dice, slowest = ck["epoch"] + 1, ck["best_dice"], ck["best_val_dice"], ck["slowest"]
++        random.setstate(ck["rng"]["python"]); np.random.set_state(ck["rng"]["numpy"])
++        torch.set_rng_state(ck["rng"]["torch"].cpu())
++        if ck["rng"]["cuda"] is not None and torch.cuda.is_available():
++            torch.cuda.set_rng_state_all([t.cpu() for t in ck["rng"]["cuda"]])
++        print("[l3d-bench] resumed after epoch {}".format(ck["epoch"]))
++
++    for epoch in range(start_epoch, n_epochs):
++        t_epoch = time.time()
+         epoch_running_loss = 0
+         epoch_seg_loss = 0
+         epoch_contrastive_loss = 0
+@@ -118,10 +170,32 @@ def main(save_path, args):
+         print(np.mean(mDice))
+         if np.mean(mDice) > best_dice:
+             best_dice = np.mean(mDice)
+-            torch.save({'model': model.state_dict(),}, "best_model_path.pth")
+-            torch.save({'model': edge_prototypes_model.state_dict(),}, "best_prototype_path.pth")
++            torch.save({'model': model.state_dict(),}, os.path.join(out_dir, "best_model_path.pth"))
++            torch.save({'model': edge_prototypes_model.state_dict(),}, os.path.join(out_dir, "best_prototype_path.pth"))
+         print("best dice is:{:.4f}".format(best_dice))
++
++        # [l3d-bench] val selection, per-epoch log, resume checkpoint, time guard
++        val_dice = (_l3d_val_dice(model, edge_prototypes_model, l3d_val_loader, device)
++                    if l3d_val_loader is not None else float("nan"))
++        if l3d_val_loader is not None and val_dice > best_val_dice:
++            best_val_dice = val_dice
++            torch.save({'model': model.state_dict(),}, os.path.join(out_dir, "best_val_model_path.pth"))
++            torch.save({'model': edge_prototypes_model.state_dict(),}, os.path.join(out_dir, "best_val_prototype_path.pth"))
++        print("[l3d-bench] epoch {} val dice {:.4f} (best {:.4f})".format(epoch, val_dice, best_val_dice))
++        with open(os.path.join(out_dir, "epochs.jsonl"), "a") as f:
++            f.write(json.dumps({"epoch": epoch, "loss": epoch_running_loss / (batch_idx + 1),
++                                "test_dice": float(np.mean(mDice)), "val_dice": val_dice,
++                                "best_test_dice": float(best_dice), "best_val_dice": float(best_val_dice),
++                                "minutes": (time.time() - t_epoch) / 60}) + "\n")
++        slowest = max(slowest, time.time() - t_epoch)
++        _l3d_save_resume(resume_path, model=model.state_dict(), prototypes=edge_prototypes_model.state_dict(),
++                         optimizer=optimizer.state_dict(), scheduler=scheduler.state_dict(), epoch=epoch,
++                         best_dice=best_dice, best_val_dice=best_val_dice, slowest=slowest)
++        if epoch + 1 < n_epochs and time.time() + 1.15 * slowest > stop_at:
++            print("[l3d-bench] session time limit: paused after epoch {}".format(epoch))
++            sys.exit(3)
+     scheduler.step()
++    open(os.path.join(out_dir, "TRAINING_DONE"), "w").write("done\n")
+ 
+ 
+ if __name__ == '__main__':

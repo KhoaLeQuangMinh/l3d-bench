@@ -9,7 +9,8 @@ after every epoch and pushed to Drive; a new session pulls it and continues at t
 augmentation depend only on (seed, epoch), so a resumed run sees the same batches as an uninterrupted one.
 
 Time budget: before starting an epoch the loop checks that it can finish it (1.15 x the slowest epoch so
-far, uploads included, + 3 min) within train.max_session_hours, and otherwise stops cleanly with status "paused".
+far, + 15 min to finish the last background uploads) within train.max_session_hours. Uploads run in the
+background, so a slow Drive no longer stalls training, and otherwise stops cleanly with status "paused".
 """
 from __future__ import annotations
 
@@ -71,9 +72,20 @@ class Trainer:
         return (self.clock() - self.t0) / 3600.0
 
     def _push(self, *names: str) -> None:
+        """Upload in the background (training continues); falls back to blocking for simple sync objects."""
         if self.drive is not None and self.drive.enabled:
+            push = getattr(self.drive, "push_file_async", self.drive.push_file)
             for n in names:
-                self.drive.push_file(self.dir / n, self.run_id)
+                push(self.dir / n, self.run_id)
+
+    def wait_uploads(self) -> None:
+        if self.drive is not None and self.drive.enabled and hasattr(self.drive, "wait"):
+            t = self.clock()
+            self.drive.wait()
+            if self.clock() - t > 60:
+                self.log(f"waited {(self.clock() - t) / 60:.1f} min for Drive uploads")
+            if getattr(self.drive, "failed", None):
+                self.log(f"WARNING: Drive uploads failed for {sorted(set(self.drive.failed))}")
 
     def _train_loader(self, epoch: int) -> DataLoader:
         self.train_ds.set_epoch(epoch)
@@ -111,6 +123,11 @@ class Trainer:
         self.history = info["extra"].get("history", [])
         if self.best["epoch"] > 0 and not (self.dir / BEST).exists():
             raise RuntimeError(f"{LATEST} says best epoch {self.best['epoch']} but {BEST} is missing")
+        if (self.dir / BEST).exists():  # best.pth holds the weights, so it is the truth about the best epoch
+            b = torch.load(self.dir / BEST, map_location="cpu", weights_only=False)
+            if b["epoch"] != self.best["epoch"]:
+                self.log(f"best.pth is epoch {b['epoch']}, checkpoint said {self.best['epoch']}; using best.pth")
+                self.best = {"epoch": b["epoch"], "select_dice": b["select_dice"]}
         self.log(f"resumed after epoch {self.done_epochs}; best so far epoch {self.best['epoch']} "
                  f"(select Dice {self.best['select_dice']:.4f})")
         return True
@@ -126,8 +143,12 @@ class Trainer:
         for i, batch in enumerate(loader):
             images = batch["image"].to(self.device, non_blocking=True)
             labels = batch["label"].to(self.device, non_blocking=True)
+            extra = {}
+            if getattr(self.model, "uses_junctions", False):
+                extra = {"junctions": batch["junctions"].to(self.device),
+                         "junction_vis": batch["junction_vis"].to(self.device)}
             with torch.autocast(self.device.type, dtype=torch.float16, enabled=self.amp):
-                loss = self.model(images, labels).loss
+                loss = self.model(images, labels, **extra).loss
             if not torch.isfinite(loss):
                 skipped += 1
                 continue
@@ -168,9 +189,10 @@ class Trainer:
         budget = float(self.tc["max_session_hours"])
         slowest = max((h["epoch_minutes"] for h in self.history), default=0.0) / 60.0
         for epoch in range(self.done_epochs + 1, self.epochs + 1):
-            if slowest and self.hours() + 1.15 * slowest + 0.05 > budget:  # + ~3 min for Drive uploads
+            if slowest and self.hours() + 1.15 * slowest + 0.25 > budget:  # + 15 min to finish uploads
                 self.log(f"time budget: {self.hours():.2f} h used, an epoch takes ~{slowest:.2f} h; "
                          f"pausing before epoch {epoch}. Re-run to continue.")
+                self.wait_uploads()
                 return {"status": "paused", "done_epochs": self.done_epochs, "best": self.best}
             t = self.clock()
             loss = self.train_epoch(epoch)
@@ -200,9 +222,10 @@ class Trainer:
             if epoch % int(self.tc.get("checkpoint_every", 1)) == 0 or epoch == self.epochs:
                 self._push(LATEST)
             self._push(HISTORY, LOG)
-            slowest = max(slowest, (self.clock() - t) / 3600.0)   # includes the checkpoint upload
+            slowest = max(slowest, (self.clock() - t) / 3600.0)
             if math.isnan(dice):
                 raise RuntimeError("selection Dice is NaN")
+        self.wait_uploads()
         return {"status": "trained", "done_epochs": self.done_epochs, "best": self.best}
 
     def load_best(self) -> dict:

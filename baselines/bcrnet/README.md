@@ -15,3 +15,8 @@ saved checkpoint on the selection set (Val = inner-val / official val) and keep 
 Patches (patches/):
 - 01_test_in_eval_mode.diff — test.py ran the model in train mode (BatchNorm uses batch statistics at
   test time). Changed to eval(). Affects scoring correctness only.
+
+Runner status: not written yet. Extra setup it needs on Kaggle: detectron2, and compiling `adet._C` (the
+multi-scale deformable attention CUDA op in adet/layers/csrc; the repo has no setup.py for it), plus the SAM
+features (scripts/precompute_sam_features.py) and Bezier targets (utils/preprocess.py) for every frame.
+It has native resume (--model_path epoch-N.pt, saved every 10 epochs).

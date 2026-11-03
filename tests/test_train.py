@@ -84,9 +84,42 @@ def test_model_forward_predict_and_groups():
     assert len(ids[0]) + len(ids[1]) == len(list(model.parameters()))
 
 
-def test_m2_not_built_yet():
-    with pytest.raises(NotImplementedError):
-        build_model(tiny_cfg("m2"))
+def _flat(d, prefix=""):
+    out = {}
+    for k, v in d.items():
+        out.update(_flat(v, f"{prefix}{k}.") if isinstance(v, dict) else {f"{prefix}{k}": v})
+    return out
+
+
+def test_configs_differ_only_in_their_switch():
+    m1, m2, m3 = (_flat(load_config(REPO_ROOT / "configs" / f"{m}.yaml")) for m in ("m1", "m2", "m3"))
+    assert {k for k in m1 if m1[k] != m2[k]} == {"model.junction"}
+    assert {k for k in m1 if m1[k] != m3[k]} == {"sampler"}
+
+
+def test_m2_head_steers_queries_and_trains():
+    torch.manual_seed(0)
+    m2 = build_model(tiny_cfg("m2"))
+    assert abs(float(m2.steering.gate) - 0.1) < 1e-7
+    assert not any("anchor_head" in n or "steering" in n for n, _ in build_model(tiny_cfg()).named_parameters())
+    x = torch.rand(2, 3, 64, 64)
+    y = torch.zeros(2, 64, 64, dtype=torch.long)
+    y[:, 20:24] = 1
+    j = torch.rand(2, 4, 2)
+    v = torch.tensor([[1.0, 1.0, 0.0, 1.0], [0.0, 0.0, 0.0, 0.0]])
+    out = m2(x, y, j, v)
+    assert torch.isfinite(out.loss) and out.junction_coords.shape == (2, 4, 2)
+    assert torch.allclose(out.loss, out.mask_loss + 5 * out.coord_loss + 1 * out.vis_loss, atol=1e-4)
+    out.loss.backward()
+    assert m2.steering.gate.grad is not None and m2.anchor_head.queries.grad.abs().sum() > 0
+    m2.eval()
+    with torch.no_grad():
+        a = m2(x).masks_queries_logits
+        m2.steering.gate.fill_(0.0)
+        b = m2(x).masks_queries_logits
+    assert not torch.allclose(a, b)                         # the steered queries really reach the decoder
+    with pytest.raises(ValueError):
+        m2.train()(x, y)                                    # training without junction targets is an error
 
 
 def test_gpu_dice_equals_protocol():
@@ -207,3 +240,8 @@ def test_overfit_loss_falls(index):
     cfg = tiny_cfg(lr_head=1e-3, lr_backbone=1e-3)
     hist = overfit(cfg, index, n_frames=4, steps=60, device="cpu", log_every=20, log=lambda *_: None)
     assert hist[-1]["loss"] < hist[0]["loss"]
+
+
+def test_m2_run_end_to_end(index, tmp_path):
+    st = run("m2__junction__official__s0", tiny_cfg("m2", epochs=2), tmp_path, index=index, device="cpu")
+    assert st["status"] == "done"
