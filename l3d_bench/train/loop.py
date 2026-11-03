@@ -9,7 +9,7 @@ after every epoch and pushed to Drive; a new session pulls it and continues at t
 augmentation depend only on (seed, epoch), so a resumed run sees the same batches as an uninterrupted one.
 
 Time budget: before starting an epoch the loop checks that it can finish it (1.15 x the slowest epoch so
-far) within train.max_session_hours, and otherwise stops cleanly with status "paused".
+far, uploads included, + 3 min) within train.max_session_hours, and otherwise stops cleanly with status "paused".
 """
 from __future__ import annotations
 
@@ -168,7 +168,7 @@ class Trainer:
         budget = float(self.tc["max_session_hours"])
         slowest = max((h["epoch_minutes"] for h in self.history), default=0.0) / 60.0
         for epoch in range(self.done_epochs + 1, self.epochs + 1):
-            if slowest and self.hours() + 1.15 * slowest > budget:
+            if slowest and self.hours() + 1.15 * slowest + 0.05 > budget:  # + ~3 min for Drive uploads
                 self.log(f"time budget: {self.hours():.2f} h used, an epoch takes ~{slowest:.2f} h; "
                          f"pausing before epoch {epoch}. Re-run to continue.")
                 return {"status": "paused", "done_epochs": self.done_epochs, "best": self.best}
@@ -177,7 +177,6 @@ class Trainer:
             dice = self.select_dice()
             self.scheduler.step()
             minutes = (self.clock() - t) / 60.0
-            slowest = max(slowest, minutes / 60.0)
             improved = dice > self.best["select_dice"] + 1e-9
             if improved:
                 self.best = {"epoch": epoch, "select_dice": dice}
@@ -201,6 +200,7 @@ class Trainer:
             if epoch % int(self.tc.get("checkpoint_every", 1)) == 0 or epoch == self.epochs:
                 self._push(LATEST)
             self._push(HISTORY, LOG)
+            slowest = max(slowest, (self.clock() - t) / 3600.0)   # includes the checkpoint upload
             if math.isnan(dice):
                 raise RuntimeError("selection Dice is NaN")
         return {"status": "trained", "done_epochs": self.done_epochs, "best": self.best}
