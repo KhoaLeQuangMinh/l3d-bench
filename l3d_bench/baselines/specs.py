@@ -51,7 +51,7 @@ class Spec:
     style = "upper"
     recipe = ""
     pilot_epochs = 2
-    reserve_hours = 0.8              # export + scoring + uploads after training
+    reserve_hours = 1.5              # final uploads (multi-GB checkpoints: up to ~1 h on a slow Drive) + export
     sync_files: list[str] = []
 
     def export_script(self) -> str:
