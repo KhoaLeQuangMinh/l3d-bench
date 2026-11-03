@@ -1,5 +1,5 @@
 diff --git a/train.py b/train.py
-index 4ddc8af..a053390 100644
+index 4ddc8af..7c5182c 100644
 --- a/train.py
 +++ b/train.py
 @@ -3,6 +3,7 @@ import json
@@ -63,7 +63,7 @@ index 4ddc8af..a053390 100644
          if epoch % args.val_interval == 0 or is_last:
              if is_main_process():
                  torch.save({
-@@ -230,6 +259,18 @@ def train(args):
+@@ -230,6 +259,27 @@ def train(args):
  
          scheduler.step()
  
@@ -73,9 +73,18 @@ index 4ddc8af..a053390 100644
 +            _l3d_save_resume(resume_path, model=unwrap(model).state_dict(), optimizer=optimizer.state_dict(),
 +                             scheduler=scheduler.state_dict(), epoch=epoch, best=best, best_val_dice=best_val_dice,
 +                             history=history, slowest=slowest)
-+        if not distributed and epoch + 1 < n_epochs and _time.time() + 1.15 * slowest > stop_at:
++        # rank 0 decides, every rank follows (DDP ranks must stop together)
++        stop = torch.tensor([int(epoch + 1 < n_epochs and _time.time() + 1.15 * slowest > stop_at)], device=device)
++        if distributed:
++            dist.broadcast(stop, 0)
++        if stop.item():
 +            log.info("[l3d-bench] session time limit: paused after epoch {}".format(epoch))
-+            sys.exit(3)
++            if is_main_process():
++                open(os.path.join(args.save_dir, "PAUSED"), "w").write("{}\n".format(epoch))
++            if distributed:
++                dist.barrier()
++                dist.destroy_process_group()
++            sys.exit(0 if distributed else 3)
 +
 +    if is_main_process():
 +        open(os.path.join(args.save_dir, "TRAINING_DONE"), "w").write("done\n")

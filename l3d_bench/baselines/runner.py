@@ -76,8 +76,22 @@ def sh(cmd, cwd=None, env=None, check=True) -> int:
     return res.returncode
 
 
+PINNED = ("torch", "torchvision", "torchaudio", "numpy", "pillow", "protobuf")
+
+
 def pip(*pkgs: str) -> None:
-    sh([sys.executable, "-m", "pip", "install", "-q", *pkgs])
+    """pip install without touching the preinstalled stack: a repo dependency (e.g. pytorch-metric-learning)
+    must never upgrade torch, or torchvision breaks ('operator torchvision::nms does not exist')."""
+    from importlib.metadata import PackageNotFoundError, version
+    pins = []
+    for name in PINNED:
+        try:
+            pins.append(f"{name}=={version(name)}")
+        except PackageNotFoundError:
+            pass
+    constraints = Path(os.environ.get("TMPDIR", "/tmp")) / "l3d_pip_constraints.txt"
+    constraints.write_text("\n".join(pins) + "\n")
+    sh([sys.executable, "-m", "pip", "install", "-q", "-c", str(constraints), *pkgs])
 
 
 # ---- repo and data ---------------------------------------------------------------------------
@@ -189,6 +203,18 @@ def push(ctx: Ctx, *names: str) -> None:
 def train(ctx: Ctx, spec, stop_at: float) -> str:
     if (ctx.run_dir / "TRAINING_DONE").exists():
         return "trained"
+    if ctx.pilot and not (ctx.run_dir / "resume.pth").exists():
+        # pilot: force a pause after the first epoch, then resume at once, so one notebook run also proves
+        # that pausing and resuming work on Kaggle (and on two GPUs for A2ONet)
+        ctx.log("pilot: session 1 stops after one epoch on purpose")
+        if _train_once(ctx, spec, stop_at=0.0) != "paused":
+            raise RuntimeError("pilot: the forced pause after epoch 1 did not happen")
+        ctx.log("pilot: session 2 resumes from resume.pth")
+    return _train_once(ctx, spec, stop_at)
+
+
+def _train_once(ctx: Ctx, spec, stop_at: float) -> str:
+    (ctx.run_dir / "PAUSED").unlink(missing_ok=True)
     cmd, cwd, extra_env = spec.train_cmd(ctx)
     env = {**os.environ, **extra_env, "L3D_STOP_AT": str(stop_at), "PYTHONUNBUFFERED": "1",
            "L3D_SAVE_DIR": str(ctx.run_dir), "WANDB_MODE": "offline"}
@@ -205,7 +231,7 @@ def train(ctx: Ctx, spec, stop_at: float) -> str:
                 print(line, end="", flush=True)
                 log.write(line)
             code = proc.wait()
-    if code == PAUSED_EXIT:
+    if code == PAUSED_EXIT or (code == 0 and (ctx.run_dir / "PAUSED").exists()):   # DDP ranks exit 0 + marker
         return "paused"
     if code != 0:
         raise RuntimeError(f"{spec.name} training exited with code {code}; see train.log")
@@ -274,7 +300,7 @@ def run_baseline(spec, ctx: Ctx, *, t0: float, released: bool = False, force: bo
         sets = ("select", "heldout") if tag in ("val", "released") else ("heldout",)
         for s in sets:
             results[f"{tag}_{s}"] = export_and_score(ctx, spec, ckpt, s, tag)
-    write_card(status="done", results=results,
+    write_card(status="done", results=results, launch=getattr(spec, "launch_info", None),
                note="'val' = selected on the val / inner-val folder (benchmark); 'native' = the repo's own "
                     "selection, on official test (reproduction only)")
     (ctx.run_dir / "DONE").write_text(time.strftime("%Y-%m-%d %H:%M:%S"))

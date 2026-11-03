@@ -111,8 +111,8 @@ class A2ONet(Spec):
     repo_url = "https://github.com/hyperiondk115/A2ONet.git"
     commit = "765ada123848c1656cfa8fc120157a093fb69b13"
     style = "lower"
-    recipe = ("README single-GPU command: --batch_size 2 (paper: 5 GPUs x batch 1); train.py defaults: 100 epochs, "
-              "Adam 1e-4, wd 1e-5, cosine to 1e-6, eval every 5 epochs, seed 3407")
+    recipe = ("DDP on Kaggle's 2 T4s, batch 1 per GPU with SyncBatchNorm (paper: 5 GPUs x batch 1); train.py "
+              "defaults: 100 epochs, Adam 1e-4, wd 1e-5, cosine to 1e-6, eval every 5 epochs, seed 3407")
     pilot_epochs = 2
     sync_files = ["best_val_path.pth", "best_path.pth", "metrics.json", "train_log.txt", "resume.pth"]
 
@@ -124,8 +124,16 @@ class A2ONet(Spec):
         self.sam, self.depth = sam_vitb(ctx), depth_anything_vitb(ctx)
 
     def train_cmd(self, ctx: Ctx):
-        return ([sys.executable, "train.py", "--data_path", str(ctx.root), "--save_dir", str(ctx.run_dir),
-                 "--batch_size", os.environ.get("L3D_BATCH_SIZE", "2"), "--num_workers", "4",
+        # The paper trained with DDP, batch 1 per GPU (5 GPUs, SyncBatchNorm). Batch 2 on one T4 runs out of
+        # memory, so on Kaggle's T4 x2 we run the authors' own DDP path: 2 GPUs x batch 1 = global batch 2,
+        # the same global batch as the README's single-GPU command. L3D_GPUS=1 falls back to one GPU, batch 1.
+        import torch
+        gpus = int(os.environ.get("L3D_GPUS", torch.cuda.device_count() or 1))
+        launch = ([sys.executable, "-m", "torch.distributed.run", "--standalone", f"--nproc_per_node={gpus}"]
+                  if gpus > 1 else [sys.executable])
+        self.launch_info = {"gpus": gpus, "batch_per_gpu": int(os.environ.get("L3D_BATCH_SIZE", "1"))}
+        return (launch + ["train.py", "--data_path", str(ctx.root), "--save_dir", str(ctx.run_dir),
+                 "--batch_size", os.environ.get("L3D_BATCH_SIZE", "1"), "--num_workers", "2",
                  "--seed", str(3407 + ctx.seed),
                  "--sam_checkpoint", str(self.sam), "--depth_checkpoint", str(self.depth),
                  "--pretrained_dir", str(ctx.weights)], ctx.repo, {})

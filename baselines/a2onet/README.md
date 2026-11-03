@@ -9,13 +9,15 @@ Checkpoint selection: saves `best_path.pth` by **test** Dice (the file its READM
 `best_val_path.pth` by val Dice. We use `best_val_path.pth`; with our roots, its test folder is also the
 selection set. Its metric (a2onet/metrics.py) is our scoring protocol.
 
-Deviation noted: single Kaggle GPU, so the global batch of 5 is not matched; we use the README's single-GPU
-command (--batch_size 2). Evaluation every 5 epochs, as released (so selection is among epochs 0, 5, ..., 99).
+Batch: batch 2 on one T4 runs out of memory (pilot, 3 Nov), so we use the authors' own DDP path on Kaggle's
+two T4s: batch 1 per GPU with SyncBatchNorm, as in the paper (which used 5 GPUs). Global batch 2 instead of 5,
+the same global batch as the README's single-GPU command. L3D_GPUS=1 falls back to one GPU at batch 1. Evaluation every 5 epochs, as released (so selection is among epochs 0, 5, ..., 99).
 Export mirrors test.py (pretrained_resnet=False, fusion alpha 1.0).
 
 Patches (patches/):
 - 01_resume.diff — infrastructure only: resume.pth after every epoch, clean exit (code 3) before Kaggle's time
-  limit, TRAINING_DONE marker, L3D_MAX_EPOCHS for the pilot. Its own best_val_path.pth / best_path.pth unchanged.
+  limit (under DDP rank 0 decides and broadcasts, all ranks exit 0 and a PAUSED marker is written),
+  TRAINING_DONE marker, L3D_MAX_EPOCHS for the pilot. Its own best_val_path.pth / best_path.pth unchanged.
 
 Check from the smoke test: on identical predictions, A2ONet's compute_metrics and our scorer give the same
 Dice, IoU and ASSD to every printed digit (it is the protocol we copied).
