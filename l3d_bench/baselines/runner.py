@@ -221,7 +221,10 @@ def _train_once(ctx: Ctx, spec, stop_at: float) -> str:
     if ctx.pilot:
         env["L3D_MAX_EPOCHS"] = str(spec.pilot_epochs)
     ctx.log("training: " + " ".join(map(str, cmd)))
-    with Watcher(ctx, spec.sync_files + ["train.log", "epochs.jsonl"]):
+    # pilots resume from the local resume.pth, so their multi-GB checkpoints are not uploaded (that alone took
+    # about an hour in the D2GPLand pilot); real runs upload everything in the background
+    names = ["train.log", "epochs.jsonl"] if ctx.pilot else spec.sync_files + ["train.log", "epochs.jsonl"]
+    with Watcher(ctx, names):
         with open(ctx.run_dir / "train.log", "a") as log:
             proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     text=True, bufsize=1)
