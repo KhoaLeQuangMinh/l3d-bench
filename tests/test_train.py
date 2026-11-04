@@ -245,3 +245,9 @@ def test_overfit_loss_falls(index):
 def test_m2_run_end_to_end(index, tmp_path):
     st = run("m2__junction__official__s0", tiny_cfg("m2", epochs=2), tmp_path, index=index, device="cpu")
     assert st["status"] == "done"
+
+
+def test_m3_pilot_has_both_poses(index, fake_l3d, tmp_path):
+    st = run("m3__posebal__official__s0", tiny_cfg("m3", epochs=2), tmp_path, index=index,
+             poses=fake_l3d["poses"], pilot=True, device="cpu")
+    assert st["status"] == "done"

@@ -55,6 +55,23 @@ def parse_overrides(pairs: list[str]) -> dict:
     return out
 
 
+def pilot_subset(ids: dict, poses: dict | None) -> dict:
+    """A few frames per set, spread over patients; the training subset holds raised and canonical frames when pose
+    labels exist (M3's sampler needs both)."""
+    out = {}
+    for k, v in ids.items():
+        n = PILOT[k]
+        if k == "train" and poses:
+            raised = [f for f in v if poses.get(f) == "raised"]
+            canon = [f for f in v if poses.get(f) == "canonical"]
+            if raised and canon:
+                h = n // 2
+                out[k] = raised[:: max(1, len(raised) // h)][:h] + canon[:: max(1, len(canon) // (n - h))][: n - h]
+                continue
+        out[k] = v[:: max(1, len(v) // n)][:n]
+    return out
+
+
 def git_commit() -> str:
     try:
         return subprocess.run(["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"], capture_output=True,
@@ -140,7 +157,7 @@ def run(run_id: str, cfg: dict, out_root: str | Path, *, drive=None, index=None,
         poses = load_poses(cfg, required=cfg.get("sampler") == "pose_balanced")
     ids, split_info = resolve_split(meta["split"], index, cfg)
     if pilot:
-        ids = {k: v[: PILOT[k]] for k, v in ids.items()}
+        ids = pilot_subset(ids, poses)
         split_info.update({f"{k}_frames": len(v) for k, v in ids.items()})
 
     prev = {}
