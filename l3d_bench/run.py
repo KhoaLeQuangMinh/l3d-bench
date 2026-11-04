@@ -143,7 +143,14 @@ def run(run_id: str, cfg: dict, out_root: str | Path, *, drive=None, index=None,
         ids = {k: v[: PILOT[k]] for k, v in ids.items()}
         split_info.update({f"{k}_frames": len(v) for k, v in ids.items()})
 
-    card = {"run_id": run_id, **meta, "status": "running", "pilot": pilot, "commit": git_commit(),
+    prev = {}
+    if (run_dir / "run_card.json").exists():
+        prev = json.loads((run_dir / "run_card.json").read_text())
+    elif drive is not None and drive.enabled and drive.exists(sync_id, "run_card.json"):
+        drive.pull_file(sync_id, "run_card.json", run_dir)
+        prev = json.loads((run_dir / "run_card.json").read_text())
+    sessions = prev.get("sessions", []) + [{"started": time.strftime("%Y-%m-%d %H:%M"), "commit": git_commit()}]
+    card = {"run_id": run_id, **meta, "status": "running", "pilot": pilot, "commit": git_commit(), "sessions": sessions,
             "config": cfg, **split_info, "environment": environment(),
             "selection_rule": "best epoch by mean A2ONet Dice on the selection set; earliest wins ties"}
     card_path = run_dir / "run_card.json"

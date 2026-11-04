@@ -24,5 +24,5 @@ Notes
 | M2 | 0, 1 | 70.83 ± 1.01 | 56.67 ± 1.19 | 11.09 ± 0.08 | 69.35 ± 1.20 | 72.90 ± 0.99 | 61.20 ± 1.13 | 18 (71.30), 23 (71.93) |
 
 - Seed 1 runs: m1__plain__official__s1 (test 70.79 / 56.76 / 12.25), m2__junction__official__s1 (71.54 / 57.51 / 11.03).
-- After two seeds M1 and M2 are tied on test Dice (70.82 vs 70.83); M2's seed spread (1.4 Dice) is larger than any
+- After two seeds M1 and M2 are tied on test Dice (70.83 vs 70.83); M2's seed spread (1.4 Dice) is larger than any
   M1-M2 gap. Val curves are flat after ~epoch 8, so the selected epoch varies a lot between seeds (9 vs 21).

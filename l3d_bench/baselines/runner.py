@@ -269,7 +269,16 @@ def run_baseline(spec, ctx: Ctx, *, t0: float, released: bool = False, force: bo
         return {"status": "already_done"}
     budget = float(ctx.cfg["train"]["max_session_hours"])
     reserve = float(spec.reserve_hours)
+    from ..run import git_commit
+    prev = {}
+    if (ctx.run_dir / "run_card.json").exists():
+        prev = json.loads((ctx.run_dir / "run_card.json").read_text())
+    elif d is not None and d.enabled and d.exists(ctx.sync_id, "run_card.json"):
+        d.pull_file(ctx.sync_id, "run_card.json", ctx.run_dir)
+        prev = json.loads((ctx.run_dir / "run_card.json").read_text())
+    sessions = prev.get("sessions", []) + [{"started": time.strftime("%Y-%m-%d %H:%M"), "l3d_bench_commit": git_commit()}]
     card = {"run_id": ctx.sync_id, "method": spec.name, "split": ctx.split, "seed": ctx.seed, "pilot": ctx.pilot,
+            "sessions": sessions,
             "repo": spec.repo_url, "repo_commit": spec.commit, "recipe": spec.recipe, "released_weights": released,
             "frames": {k: len(v) for k, v in ctx.ids.items()}, "status": "running",
             "batch_size_override": os.environ.get("L3D_BATCH_SIZE")}
