@@ -1,3 +1,10 @@
+> **Decision (4 Nov): TopoNet is not retrained.** It is reported from the authors' released weights on the
+> official split only (scored with our protocol in run `_g2__toponet__released`), labelled "released checkpoint,
+> selected by the authors (on test)", and is absent from the fold analysis. Reason: at the authors' batch size it
+> does not fit a 16 GB T4 without changing the method (after three memory-only patches it still runs out of memory
+> when the topology losses start, epoch 6), and one 200-epoch run would cost ~200 T4 GPU-hours. The training
+> setup below is kept, tested up to epoch 6, so the run can be done later on a larger GPU.
+
 # TopoNet (MICCAI 2025) — https://github.com/cuiruize/TopoNet @ be25da521d5a0fb7dd1a06990c8e1532c6597cb1
 
 Recipe as released: `python train.py --data_path <train_root> --depth_path depth_anything_v2_vitb.pth --save_path <out>/`
@@ -7,7 +14,10 @@ Data root style: **lower** (`train/ val/ test/`); any other folder name is read 
 Checkpoint selection: `train.py` validates on `test_file` (its test split) and keeps `best_model_path.pth`.
 Our training root points `test/` at the selection set (inner-val or official val), so it selects there.
 
-Known quirks kept as released: `scheduler.step()` sits after the epoch loop (LR stays at 1e-4);
+Known quirks kept as released: the warm-up loss of epochs 0-5 is `_dice_loss(y_batch, output)` while the
+function is `_dice_loss(pred, target)`, so softmax is applied to the ground truth and the raw logits are used as
+the target; the logged loss can be negative or above 1 in those epochs (seen in the pilot, 4 Nov). From epoch 6
+the clDice + Betti losses take the arguments in the right order. `scheduler.step()` sits after the epoch loop (LR stays at 1e-4);
 4K canvases chosen by path substring (`_31`, `_36`, `_25`, `_29`), which misses Patient 32.
 
 Patches (patches/):

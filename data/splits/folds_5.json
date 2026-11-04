@@ -1,0 +1,281 @@
+{
+  "folds": [
+    {
+      "fold": 0,
+      "frames": {
+        "heldout": 207,
+        "inner_val": 91,
+        "train": 745
+      },
+      "heldout": [
+        "Patient_2",
+        "Patient_29",
+        "Patient_34",
+        "Patient_36",
+        "Patient_4",
+        "Patient_40",
+        "Patient_42"
+      ],
+      "inner_val": [
+        "Patient_14",
+        "Patient_19",
+        "Patient_39"
+      ],
+      "raised": {
+        "heldout": 16,
+        "inner_val": 8,
+        "train": 69
+      },
+      "train": [
+        "Patient_1",
+        "Patient_12",
+        "Patient_15",
+        "Patient_16",
+        "Patient_17",
+        "Patient_18",
+        "Patient_20",
+        "Patient_22",
+        "Patient_23",
+        "Patient_25",
+        "Patient_30",
+        "Patient_32",
+        "Patient_33",
+        "Patient_35",
+        "Patient_38",
+        "Patient_44",
+        "Patient_45",
+        "Patient_49",
+        "Patient_5",
+        "Patient_50",
+        "Patient_52",
+        "Patient_53",
+        "Patient_54",
+        "Patient_61",
+        "Patient_8"
+      ]
+    },
+    {
+      "fold": 1,
+      "frames": {
+        "heldout": 214,
+        "inner_val": 91,
+        "train": 738
+      },
+      "heldout": [
+        "Patient_1",
+        "Patient_18",
+        "Patient_20",
+        "Patient_35",
+        "Patient_44",
+        "Patient_45",
+        "Patient_50"
+      ],
+      "inner_val": [
+        "Patient_14",
+        "Patient_19",
+        "Patient_39"
+      ],
+      "raised": {
+        "heldout": 29,
+        "inner_val": 8,
+        "train": 56
+      },
+      "train": [
+        "Patient_12",
+        "Patient_15",
+        "Patient_16",
+        "Patient_17",
+        "Patient_2",
+        "Patient_22",
+        "Patient_23",
+        "Patient_25",
+        "Patient_29",
+        "Patient_30",
+        "Patient_32",
+        "Patient_33",
+        "Patient_34",
+        "Patient_36",
+        "Patient_38",
+        "Patient_4",
+        "Patient_40",
+        "Patient_42",
+        "Patient_49",
+        "Patient_5",
+        "Patient_52",
+        "Patient_53",
+        "Patient_54",
+        "Patient_61",
+        "Patient_8"
+      ]
+    },
+    {
+      "fold": 2,
+      "frames": {
+        "heldout": 207,
+        "inner_val": 93,
+        "train": 743
+      },
+      "heldout": [
+        "Patient_14",
+        "Patient_22",
+        "Patient_23",
+        "Patient_25",
+        "Patient_32",
+        "Patient_53",
+        "Patient_61"
+      ],
+      "inner_val": [
+        "Patient_2",
+        "Patient_39",
+        "Patient_50"
+      ],
+      "raised": {
+        "heldout": 14,
+        "inner_val": 6,
+        "train": 73
+      },
+      "train": [
+        "Patient_1",
+        "Patient_12",
+        "Patient_15",
+        "Patient_16",
+        "Patient_17",
+        "Patient_18",
+        "Patient_19",
+        "Patient_20",
+        "Patient_29",
+        "Patient_30",
+        "Patient_33",
+        "Patient_34",
+        "Patient_35",
+        "Patient_36",
+        "Patient_38",
+        "Patient_4",
+        "Patient_40",
+        "Patient_42",
+        "Patient_44",
+        "Patient_45",
+        "Patient_49",
+        "Patient_5",
+        "Patient_52",
+        "Patient_54",
+        "Patient_8"
+      ]
+    },
+    {
+      "fold": 3,
+      "frames": {
+        "heldout": 208,
+        "inner_val": 91,
+        "train": 744
+      },
+      "heldout": [
+        "Patient_12",
+        "Patient_16",
+        "Patient_17",
+        "Patient_33",
+        "Patient_5",
+        "Patient_54",
+        "Patient_8"
+      ],
+      "inner_val": [
+        "Patient_14",
+        "Patient_19",
+        "Patient_39"
+      ],
+      "raised": {
+        "heldout": 20,
+        "inner_val": 8,
+        "train": 65
+      },
+      "train": [
+        "Patient_1",
+        "Patient_15",
+        "Patient_18",
+        "Patient_2",
+        "Patient_20",
+        "Patient_22",
+        "Patient_23",
+        "Patient_25",
+        "Patient_29",
+        "Patient_30",
+        "Patient_32",
+        "Patient_34",
+        "Patient_35",
+        "Patient_36",
+        "Patient_38",
+        "Patient_4",
+        "Patient_40",
+        "Patient_42",
+        "Patient_44",
+        "Patient_45",
+        "Patient_49",
+        "Patient_50",
+        "Patient_52",
+        "Patient_53",
+        "Patient_61"
+      ]
+    },
+    {
+      "fold": 4,
+      "frames": {
+        "heldout": 207,
+        "inner_val": 89,
+        "train": 747
+      },
+      "heldout": [
+        "Patient_15",
+        "Patient_19",
+        "Patient_30",
+        "Patient_38",
+        "Patient_39",
+        "Patient_49",
+        "Patient_52"
+      ],
+      "inner_val": [
+        "Patient_22",
+        "Patient_32",
+        "Patient_61"
+      ],
+      "raised": {
+        "heldout": 14,
+        "inner_val": 6,
+        "train": 73
+      },
+      "train": [
+        "Patient_1",
+        "Patient_12",
+        "Patient_14",
+        "Patient_16",
+        "Patient_17",
+        "Patient_18",
+        "Patient_2",
+        "Patient_20",
+        "Patient_23",
+        "Patient_25",
+        "Patient_29",
+        "Patient_33",
+        "Patient_34",
+        "Patient_35",
+        "Patient_36",
+        "Patient_4",
+        "Patient_40",
+        "Patient_42",
+        "Patient_44",
+        "Patient_45",
+        "Patient_5",
+        "Patient_50",
+        "Patient_53",
+        "Patient_54",
+        "Patient_8"
+      ]
+    }
+  ],
+  "k": 5,
+  "n_inner": 3,
+  "pool_frames": 1043,
+  "pool_patients": 35,
+  "pool_raised": 93,
+  "pose_stratified": true,
+  "seed": 0
+}

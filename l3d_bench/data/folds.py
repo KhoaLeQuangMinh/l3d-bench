@@ -7,7 +7,8 @@ Each fold i has three disjoint patient sets:
 Test patients of the official split never appear. A patient never spans two sets of the same fold.
 
 Assignment is greedy: patients sorted by frame count (largest first) go to the fold that most reduces
-imbalance in frame count and raised-pose share. Inner-val patients are chosen exhaustively among each
+imbalance in frame count and raised-pose share; then patients are swapped between folds while a swap lowers
+that imbalance. Inner-val patients are chosen exhaustively among each
 fold's training patients to match the pool's raised share and a target frame count.
 """
 from __future__ import annotations
@@ -68,6 +69,35 @@ def make_folds(index: pd.DataFrame, poses: dict[str, str] | None = None, k: int 
         members[best].append(row["patient"])
         sizes[best] += row["n"]
         raised[best] += row["raised"]
+
+    # refine: swap patients between folds while that lowers the imbalance (keeps patients per fold fixed)
+    n_of = dict(zip(tab["patient"], tab["n"]))
+    r_of = dict(zip(tab["patient"], tab["raised"]))
+    cost = _imbalance(sizes, raised, target_n, target_r)
+    improved = True
+    while improved:
+        improved = False
+        for a in range(k):
+            for b in range(a + 1, k):
+                for pa in list(members[a]):
+                    for pb in list(members[b]):
+                        s, r = sizes.copy(), raised.copy()
+                        s[a] += n_of[pb] - n_of[pa]
+                        s[b] += n_of[pa] - n_of[pb]
+                        r[a] += r_of[pb] - r_of[pa]
+                        r[b] += r_of[pa] - r_of[pb]
+                        c = _imbalance(s, r, target_n, target_r)
+                        if c < cost - 1e-12:
+                            members[a].remove(pa); members[a].append(pb)
+                            members[b].remove(pb); members[b].append(pa)
+                            sizes, raised, cost, improved = s, r, c, True
+                            break
+                    if improved:
+                        break
+                if improved:
+                    break
+            if improved:
+                break
 
     lookup = tab.set_index("patient")
     folds = []

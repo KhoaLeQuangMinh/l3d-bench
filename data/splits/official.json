@@ -1,0 +1,48 @@
+{
+  "fold": "official",
+  "train": [
+    "Patient_1",
+    "Patient_12",
+    "Patient_14",
+    "Patient_15",
+    "Patient_16",
+    "Patient_17",
+    "Patient_19",
+    "Patient_2",
+    "Patient_20",
+    "Patient_22",
+    "Patient_23",
+    "Patient_25",
+    "Patient_29",
+    "Patient_30",
+    "Patient_33",
+    "Patient_34",
+    "Patient_35",
+    "Patient_36",
+    "Patient_38",
+    "Patient_39",
+    "Patient_4",
+    "Patient_42",
+    "Patient_44",
+    "Patient_45",
+    "Patient_49",
+    "Patient_5",
+    "Patient_50",
+    "Patient_52",
+    "Patient_53",
+    "Patient_54",
+    "Patient_61",
+    "Patient_8"
+  ],
+  "inner_val": [
+    "Patient_18",
+    "Patient_32",
+    "Patient_40"
+  ],
+  "heldout": [
+    "Patient_21",
+    "Patient_31",
+    "Patient_41",
+    "Patient_51"
+  ]
+}

@@ -91,9 +91,13 @@ class DriveSync:
         tail = f"{self.base_dir}/{run_id}" + (f"/{name}" if name else "")
         return f"{self.remote}:{tail}"
 
-    def _exec(self, args: list[str], attempts: int = 5, backoff: float = 5.0) -> bool:
+    def _exec(self, args: list[str], attempts: int = 8, backoff: float = 10.0) -> bool:
+        """Retries with backoff 10, 20, 40, 80, 120, 120, 120 s (~8.5 min): enough to ride out Drive's per-minute
+        'Quota exceeded for quota metric Queries' errors when several lab runs upload at once. --tpslimit keeps
+        each process under 4 API calls per second."""
         if not self.enabled:
             return False
+        args = args + ["--tpslimit", "4"]
         for attempt in range(1, attempts + 1):
             res = self._run(["rclone"] + args, capture_output=True, text=True)
             if res.returncode == 0:
@@ -101,7 +105,7 @@ class DriveSync:
             print(f"[drive] attempt {attempt}/{attempts} failed: {res.stderr.strip()[:120]}")
             if attempt < attempts:
                 self._sleep(backoff)
-                backoff *= 2.0
+                backoff = min(backoff * 2.0, 120.0)
         return False
 
     def push_file(self, local: str | Path, run_id: str) -> bool:
