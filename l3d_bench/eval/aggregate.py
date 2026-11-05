@@ -15,7 +15,10 @@ def summarize(frames: pd.DataFrame, n_boot: int = 1000, seed: int = 0) -> dict:
     out["mean"] = {m: float(np.nanmean(frames[m])) for m in cols}
     out["per_patient"] = frames.groupby("patient")[cols].mean().round(4).to_dict("index")
     if "pose" in frames.columns and frames["pose"].isin(["canonical", "raised"]).any():
-        out["per_pose"] = {p: {m: float(np.nanmean(g[m])) for m in cols} | {"n_frames": len(g)}
+        def _mean(x):  # NaN (no warning) when a class is absent from every frame of a group
+            x = np.asarray(x, dtype=float)
+            return float(np.nanmean(x)) if np.isfinite(x).any() else float("nan")
+        out["per_pose"] = {p: {m: _mean(g[m]) for m in cols} | {"n_frames": len(g)}
                            for p, g in frames.groupby("pose") if p in ("canonical", "raised")}
     if out["n_patients"] >= 5 and n_boot > 0:
         out["ci95"] = patient_bootstrap(frames, cols, n_boot, seed)

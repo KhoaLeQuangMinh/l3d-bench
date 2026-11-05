@@ -1,0 +1,40 @@
+run_id,method,split,seed,account,week,commit,status,note
+m1__plain__official__s0,m1,official,0,acct01,0,main,done,
+m1__plain__official__s1,m1,official,1,acct01,0,main,done,
+m2__junction__official__s0,m2,official,0,acct02,0,main,done,
+m2__junction__official__s1,m2,official,1,acct02,0,main,done,
+m3__posebal__official__s0,m3,official,0,acct01,1,main,todo,
+m3__posebal__official__s1,m3,official,1,acct02,1,main,todo,
+a2onet__official__official__s0,a2onet,official,0,acct03,1,main,running,
+d2gpland__official__official__s0,d2gpland,official,0,acct04,1,main,running,
+bcrnet__official__official__s0,bcrnet,official,0,acct10,1,main,blocked,runner not written yet
+m1__plain__f0__s0,m1,f0,0,acct05,1,study-v1,todo,
+m1__plain__f1__s0,m1,f1,0,acct05,1,study-v1,todo,
+m1__plain__f2__s0,m1,f2,0,acct05,1,study-v1,todo,
+m1__plain__f3__s0,m1,f3,0,acct06,1,study-v1,todo,
+m1__plain__f4__s0,m1,f4,0,acct06,1,study-v1,todo,
+m2__junction__f0__s0,m2,f0,0,acct06,1,study-v1,todo,
+m2__junction__f1__s0,m2,f1,0,acct07,1,study-v1,todo,
+m2__junction__f2__s0,m2,f2,0,acct07,1,study-v1,todo,
+m2__junction__f3__s0,m2,f3,0,acct07,1,study-v1,todo,
+m2__junction__f4__s0,m2,f4,0,acct08,1,study-v1,todo,
+m3__posebal__f0__s0,m3,f0,0,acct08,1,study-v1,todo,
+m3__posebal__f1__s0,m3,f1,0,acct08,1,study-v1,todo,
+m3__posebal__f2__s0,m3,f2,0,acct09,1,study-v1,todo,
+m3__posebal__f3__s0,m3,f3,0,acct09,1,study-v1,todo,
+m3__posebal__f4__s0,m3,f4,0,acct09,1,study-v1,todo,
+a2onet__official__f0__s0,a2onet,f0,0,acct01,2,study-v1,todo,"T4 x2, ~30 h: one fold per account-week"
+a2onet__official__f1__s0,a2onet,f1,0,acct02,2,study-v1,todo,"T4 x2, ~30 h: one fold per account-week"
+a2onet__official__f2__s0,a2onet,f2,0,acct03,2,study-v1,todo,"T4 x2, ~30 h: one fold per account-week"
+a2onet__official__f3__s0,a2onet,f3,0,acct04,2,study-v1,todo,"T4 x2, ~30 h: one fold per account-week"
+a2onet__official__f4__s0,a2onet,f4,0,acct05,2,study-v1,todo,"T4 x2, ~30 h: one fold per account-week"
+d2gpland__official__f0__s0,d2gpland,f0,0,acct06,2,study-v1,todo,~20 h
+d2gpland__official__f1__s0,d2gpland,f1,0,acct07,2,study-v1,todo,~20 h
+d2gpland__official__f2__s0,d2gpland,f2,0,acct08,2,study-v1,todo,~20 h
+d2gpland__official__f3__s0,d2gpland,f3,0,acct09,2,study-v1,todo,~20 h
+d2gpland__official__f4__s0,d2gpland,f4,0,acct10,2,study-v1,todo,~20 h
+bcrnet__official__f0__s0,bcrnet,f0,0,acct01,3,study-v1,blocked,runner not written yet
+bcrnet__official__f1__s0,bcrnet,f1,0,acct02,3,study-v1,blocked,runner not written yet
+bcrnet__official__f2__s0,bcrnet,f2,0,acct03,3,study-v1,blocked,runner not written yet
+bcrnet__official__f3__s0,bcrnet,f3,0,acct04,3,study-v1,blocked,runner not written yet
+bcrnet__official__f4__s0,bcrnet,f4,0,acct05,3,study-v1,blocked,runner not written yet

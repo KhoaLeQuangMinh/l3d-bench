@@ -251,3 +251,15 @@ def test_m3_pilot_has_both_poses(index, fake_l3d, tmp_path):
     st = run("m3__posebal__official__s0", tiny_cfg("m3", epochs=2), tmp_path, index=index,
              poses=fake_l3d["poses"], pilot=True, device="cpu")
     assert st["status"] == "done"
+
+
+def test_base_config_matches_freeze():
+    import yaml
+    frozen = yaml.safe_load((REPO_ROOT / "configs" / "frozen.yaml").read_text())
+    assert load_config() == frozen, "configs/base.yaml changed after the study-v1 freeze"
+
+
+def test_manifest_ids_valid():
+    from l3d_bench.runs.manifest import load_manifest
+    m = load_manifest(REPO_ROOT / "runs" / "manifest.csv")
+    assert set(m.loc[m["split"] != "official", "commit"]) == {"study-v1"}

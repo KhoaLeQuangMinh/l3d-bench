@@ -1,0 +1,53 @@
+# Study settings frozen at tag study-v1 (5 Nov 2026). tests/test_train.py checks that
+# configs/base.yaml still resolves to exactly this; m1/m2/m3.yaml only switch model.junction / sampler.
+data:
+  roots:
+    train: /kaggle/input/datasets/khoatrytopublish/l3d-train/Train
+    val: /kaggle/input/datasets/khoatrytopublish/l3d-val/Val
+    test: /kaggle/input/datasets/khoatrytopublish/l3d-test/Test
+  index_file: data/index.csv
+  folds_file: data/splits/folds_5.json
+  pose_file: data/pose_labels.csv
+  input_size: 1024
+metric:
+  line_width_at_1080: 35
+  score_size: 1024
+  empty_assd: 80.0
+  num_classes: 4
+junctions:
+  connect_threshold_at_1080: 150
+augment:
+  hflip_p: 0.5
+  scale_range:
+  - 0.8
+  - 1.2
+  translate_frac: 0.05
+  color_jitter: 0.15
+  vertical_flip: false
+model:
+  backbone: facebook/mask2former-swin-tiny-ade-semantic
+  junction: false
+  junction_gate_init: 0.1
+  junction_loss_coord: 5.0
+  junction_loss_vis: 1.0
+sampler: uniform
+train:
+  epochs: 50
+  scheduler: cosine
+  eta_min: 1.0e-06
+  clip_grad_norm: 5.0
+  eval_batch_size: 2
+  lr_backbone: 1.0e-05
+  lr_head: 0.0001
+  weight_decay: 0.0001
+  batch_size: 2
+  accumulation: 2
+  amp: true
+  num_workers: 4
+  checkpoint_every: 1
+  max_session_hours: 11.3
+  final_reserve_hours: 0.4
+drive:
+  remote: gdrive
+  base_dir: l3d-bench/results
+  secret_name: RCLONE_CONFIG_GDRIVE
