@@ -48,3 +48,28 @@ def test_every_spec_has_patches_and_export():
         assert list((REPO_ROOT / "baselines" / name / "patches").glob("*.diff")), name
         assert Path(spec.export_script()).exists(), name
         assert len(spec.commit) == 40
+
+
+def test_bcrnet_frames_roundtrip_and_sam_input(index, tmp_path):
+    import numpy as np
+    from l3d_bench.baselines.bcrnet_prep import read_frames, sam_input, write_frames
+    ids = list(index["frame_id"][:3])
+    rows = read_frames(write_frames(tmp_path / "f.tsv", index, ids))
+    assert [r[0] for r in rows] == ids and all(Path(r[1]).exists() and Path(r[2]).exists() for r in rows)
+    x = sam_input(np.zeros((108, 192, 3), np.uint8))
+    assert x.shape == (1024, 1024, 3)                                      # squashed, like BCRNet's input
+
+
+def test_bcrnet_selection_picks_best_then_earliest(index, tmp_path, monkeypatch):
+    import json
+    from l3d_bench.baselines import specs
+    ctx = make_ctx("bcrnet", "official", 0, tmp_path / "runs", tmp_path / "w", load_config(), index=index)
+    ctx.run_dir.mkdir(parents=True)
+    for e in (10, 20, 30):
+        (ctx.run_dir / f"epoch-{e}.pt").write_text("x")
+    (ctx.run_dir / "selection.json").write_text(json.dumps({
+        "epoch-10.pt": {"epoch": 10, "select_dice": 0.5}, "epoch-20.pt": {"epoch": 20, "select_dice": 0.7},
+        "epoch-30.pt": {"epoch": 30, "select_dice": 0.7}}))
+    monkeypatch.setattr(specs, "sh", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no re-scoring")))
+    ck = specs.BCRNet().checkpoints(ctx)
+    assert ck["val"].name == "epoch-20.pt" and ck["native"].name == "epoch-30.pt"

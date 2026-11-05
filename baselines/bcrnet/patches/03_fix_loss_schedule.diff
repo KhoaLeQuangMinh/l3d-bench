@@ -1,0 +1,13 @@
+diff --git a/train.py b/train.py
+index c66e51a..890a393 100644
+--- a/train.py
++++ b/train.py
+@@ -61,7 +61,7 @@ def main(args):
+             torch.cuda.set_rng_state_all([t.cpu() for t in ck["rng"]["cuda"]])
+         print("[l3d-bench] resumed after epoch {}".format(start_epoch))
+ 
+-    sigmoid_weight = lambda e: 1-torch.sigmoid((e-10)/2)
++    sigmoid_weight = lambda e: 1-torch.sigmoid(torch.tensor((e-10)/2))  # [l3d-bench] released code passed a float: TypeError
+    
+     for epoch in range(start_epoch+1, n_epochs+1):
+         t_epoch = time.time()

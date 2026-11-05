@@ -262,4 +262,6 @@ def test_base_config_matches_freeze():
 def test_manifest_ids_valid():
     from l3d_bench.runs.manifest import load_manifest
     m = load_manifest(REPO_ROOT / "runs" / "manifest.csv")
-    assert set(m.loc[m["split"] != "official", "commit"]) == {"study-v1"}
+    folds = m[m["split"] != "official"]
+    assert set(folds.loc[folds["method"] != "bcrnet", "commit"]) == {"study-v1"}
+    assert set(folds.loc[folds["method"] == "bcrnet", "commit"]) == {"bcrnet-v1"}   # study-v1 + BCRNet runner

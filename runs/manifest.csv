@@ -7,7 +7,7 @@ m3__posebal__official__s0,m3,official,0,acct01,1,main,todo,
 m3__posebal__official__s1,m3,official,1,acct02,1,main,todo,
 a2onet__official__official__s0,a2onet,official,0,acct03,1,main,running,
 d2gpland__official__official__s0,d2gpland,official,0,acct04,1,main,running,
-bcrnet__official__official__s0,bcrnet,official,0,acct10,1,main,blocked,runner not written yet
+bcrnet__official__official__s0,bcrnet,official,0,acct10,1,main,todo,pilot first (PILOT=True)
 m1__plain__f0__s0,m1,f0,0,acct05,1,study-v1,todo,
 m1__plain__f1__s0,m1,f1,0,acct05,1,study-v1,todo,
 m1__plain__f2__s0,m1,f2,0,acct05,1,study-v1,todo,
@@ -33,8 +33,8 @@ d2gpland__official__f1__s0,d2gpland,f1,0,acct07,2,study-v1,todo,~20 h
 d2gpland__official__f2__s0,d2gpland,f2,0,acct08,2,study-v1,todo,~20 h
 d2gpland__official__f3__s0,d2gpland,f3,0,acct09,2,study-v1,todo,~20 h
 d2gpland__official__f4__s0,d2gpland,f4,0,acct10,2,study-v1,todo,~20 h
-bcrnet__official__f0__s0,bcrnet,f0,0,acct01,3,study-v1,blocked,runner not written yet
-bcrnet__official__f1__s0,bcrnet,f1,0,acct02,3,study-v1,blocked,runner not written yet
-bcrnet__official__f2__s0,bcrnet,f2,0,acct03,3,study-v1,blocked,runner not written yet
-bcrnet__official__f3__s0,bcrnet,f3,0,acct04,3,study-v1,blocked,runner not written yet
-bcrnet__official__f4__s0,bcrnet,f4,0,acct05,3,study-v1,blocked,runner not written yet
+bcrnet__official__f0__s0,bcrnet,f0,0,acct01,3,bcrnet-v1,todo,after the official run works; tag bcrnet-v1 = study-v1 + BCRNet runner
+bcrnet__official__f1__s0,bcrnet,f1,0,acct02,3,bcrnet-v1,todo,after the official run works; tag bcrnet-v1 = study-v1 + BCRNet runner
+bcrnet__official__f2__s0,bcrnet,f2,0,acct03,3,bcrnet-v1,todo,after the official run works; tag bcrnet-v1 = study-v1 + BCRNet runner
+bcrnet__official__f3__s0,bcrnet,f3,0,acct04,3,bcrnet-v1,todo,after the official run works; tag bcrnet-v1 = study-v1 + BCRNet runner
+bcrnet__official__f4__s0,bcrnet,f4,0,acct05,3,bcrnet-v1,todo,after the official run works; tag bcrnet-v1 = study-v1 + BCRNet runner

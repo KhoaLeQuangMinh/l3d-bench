@@ -7,7 +7,9 @@ them into strings and crash: their defaults are the recipe, and we leave them al
 from __future__ import annotations
 
 import os
+import shutil
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -184,9 +186,116 @@ class D2GPLand(Spec):
                 "--list", str(frame_list), "--out", str(out), "--native_json", str(native)]
 
 
-def sh_out(cmd) -> str:
+class BCRNet(Spec):
+    name = "bcrnet"
+    repo_url = "https://github.com/jinlab-imvr/BCRNet.git"
+    commit = "5bf74f941f7e7961b095fb731b0d73ee0b545442"
+    style = "upper"
+    recipe = "paper / README: 60 epochs, batch 4, Adam 1e-5, wd 1e-4 (train.py has no defaults; passed on the CLI)"
+    epochs, batch = 60, 4
+    pilot_epochs = 2
+    reserve_hours = 2.0              # + scoring the 6 saved checkpoints on the selection set
+    sync_files = [f"epoch-{e}.pt" for e in range(10, 61, 10)] + ["epoch-2.pt", "selection.json", "resume.pth"]
+
+    def setup(self, ctx: Ctx, released: bool = False) -> None:
+        import json
+        if released:
+            raise ValueError("BCRNet has no released weights")
+        if once(ctx, "bcrnet_pip"):
+            pip("fvcore", "shapely", "timm", "wandb", "ninja", "git+https://github.com/facebookresearch/segment-anything.git")
+        if not (ctx.repo / ".l3d_ext.json").exists():          # once per session (the clone lives in the work folder)
+            out = sh_out([sys.executable, str(REPO_ROOT / "baselines" / "bcrnet" / "build_ext.py")], cwd=ctx.repo)
+            (ctx.repo / ".l3d_ext.json").write_text(out.splitlines()[-1])
+            if "error" in json.loads(out.splitlines()[-1]):
+                ctx.log("adet._C build output (tail):\n" + out[-3000:])
+        self.launch_info = json.loads((ctx.repo / ".l3d_ext.json").read_text())
+        ctx.log(f"adet._C: {self.launch_info}")
+        self.prep = self.precompute(ctx)
+
+    def precompute(self, ctx: Ctx) -> Path:
+        """SAM features + Bezier targets for every frame of this run. ~4 MB of SAM features per frame, so they
+        go to local scratch (/tmp on Kaggle; /kaggle/working is capped at 20 GB) and the work folder links to it."""
+        from .bcrnet_prep import write_frames
+        target = Path(os.environ.get("L3D_PRECOMP_DIR", "/tmp/l3d_bcrnet_precomputed" if Path("/kaggle").exists()
+                                     else str(ctx.work / "precomputed_data")))
+        target.mkdir(parents=True, exist_ok=True)
+        link = ctx.work / "precomputed"
+        if not link.exists():
+            link.symlink_to(target, target_is_directory=True)
+        ids = list(dict.fromkeys(ctx.ids["train"] + ctx.ids["select"] + ctx.ids["heldout"]))
+        frames = write_frames(ctx.work / f"bcrnet_frames_{ctx.sync_id}.tsv", ctx.index, ids)
+        t = time.time()
+        sh([sys.executable, "-m", "l3d_bench.baselines.bcrnet_prep", "beziers", "--frames", str(frames),
+            "--repo", str(ctx.repo), "--out", str(link / "s_bezier")], cwd=REPO_ROOT)
+        sh([sys.executable, "-m", "l3d_bench.baselines.bcrnet_prep", "sam", "--frames", str(frames),
+            "--checkpoint", str(sam_vitb(ctx)), "--out", str(link / "sam"),
+            "--device", "cuda" if _cuda() else "cpu"], cwd=REPO_ROOT)
+        ctx.log(f"BCRNet inputs ready for {len(ids)} frames ({(time.time() - t) / 60:.1f} min)")
+        return link
+
+    def train_cmd(self, ctx: Ctx):
+        return ([sys.executable, "train.py", "--data_path", f"{ctx.root}/", "--epoch", str(self.epochs),
+                 "--bs", os.environ.get("L3D_BATCH_SIZE", str(self.batch)), "--save_path", str(ctx.run_dir)],
+                ctx.repo, {})
+
+    def checkpoints(self, ctx: Ctx) -> dict:
+        """BCRNet's code selects nothing: it saves epoch-N.pt every 10 epochs (and, with patch 02, at the last
+        epoch) and logs val Dice to wandb. We score every saved checkpoint on the selection set with our
+        metric (model.eval()) and keep the best, earliest on ties. On the official split the 'native'
+        reproduction number is the last checkpoint run as the released test.py runs it (train mode)."""
+        import json
+
+        from ..eval.score import score_folder
+        from .runner import write_list
+        cands = sorted(ctx.run_dir.glob("epoch-*.pt"), key=lambda p: int(p.stem.split("-")[1]))
+        if not cands:
+            raise FileNotFoundError(f"no epoch-*.pt in {ctx.run_dir}")
+        path = ctx.run_dir / "selection.json"
+        sel = json.loads(path.read_text()) if path.exists() else {}
+        lst = write_list(ctx, "selection", ctx.ids["select"])
+        for ck in cands:
+            if ck.name in sel:
+                continue
+            out = ctx.work / "selection_preds" / ck.stem
+            if out.exists():
+                shutil.rmtree(out)
+            sh(self._export(ctx, ck, lst, out, ctx.work / f"selection_{ck.stem}_native.json", "eval"), cwd=ctx.repo)
+            frames = score_folder(out, ctx.index, ctx.ids["select"], None, ctx.cfg["metric"])
+            sel[ck.name] = {"epoch": int(ck.stem.split("-")[1]), "select_dice": float(frames["dice"].mean())}
+            path.write_text(json.dumps(sel, indent=2))
+            ctx.log(f"selection: {ck.name} select Dice {sel[ck.name]['select_dice']:.4f}")
+        if ctx.drive is not None and ctx.drive.enabled:
+            ctx.drive.push_file(path, ctx.sync_id)
+        best = max(cands, key=lambda p: (round(sel[p.name]["select_dice"], 9), -sel[p.name]["epoch"]))
+        ctx.log(f"selected {best.name} (select Dice {sel[best.name]['select_dice']:.4f})")
+        ck = {"val": best}
+        if ctx.split == "official":
+            ck["native"] = cands[-1]
+        return ck
+
+    def _export(self, ctx: Ctx, ckpt: Path, frame_list: Path, out: Path, native: Path, mode: str):
+        return [sys.executable, self.export_script(), "--model_path", str(ckpt), "--list", str(frame_list),
+                "--precomputed", str(ctx.work / "precomputed"), "--out", str(out), "--native_json", str(native),
+                "--mode", mode]
+
+    def export_cmd(self, ctx: Ctx, ckpt: Path, frame_list: Path, out: Path, native: Path):
+        return self._export(ctx, ckpt, frame_list, out, native, "train" if ctx.current_tag == "native" else "eval")
+
+
+def _cuda() -> bool:
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except ImportError:
+        return False
+
+
+def sh_out(cmd, cwd=None) -> str:
     import subprocess
-    return subprocess.run(cmd, capture_output=True, text=True, check=True).stdout.strip()
+    res = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+    if res.returncode != 0:
+        raise RuntimeError(f"command failed ({res.returncode}): {cmd}\n{res.stderr[-2000:]}")
+    return res.stdout.strip()
 
 
-SPECS = {s.name: s for s in (TopoNet(), A2ONet(), D2GPLand())}
+SPECS = {s.name: s for s in (TopoNet(), A2ONet(), D2GPLand(), BCRNet())}

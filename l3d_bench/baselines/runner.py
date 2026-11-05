@@ -50,6 +50,7 @@ class Ctx:
     ids: dict
     pilot: bool = False
     drive: object = None
+    current_tag: str = ""    # set while exporting ('val', 'native', 'released'); BCRNet runs 'native' in train mode
     repo: Path = field(init=False)
     weights: Path = field(init=False)
     root: Path = field(init=False)
@@ -247,6 +248,7 @@ def export_and_score(ctx: Ctx, spec, ckpt: Path, set_name: str, tag: str) -> dic
     ids = ctx.ids[set_name]
     out = ctx.run_dir / f"pred_{tag}_{set_name}"
     native = ctx.run_dir / f"repometric_{tag}_{set_name}.json"
+    ctx.current_tag = tag
     sh(spec.export_cmd(ctx, ckpt, write_list(ctx, f"{tag}_{set_name}", ids), out, native), cwd=ctx.repo)
     frames = score_folder(out, ctx.index, ids, None, ctx.cfg["metric"])
     frames.to_csv(ctx.run_dir / f"{tag}_{set_name}_frames.csv", index=False)

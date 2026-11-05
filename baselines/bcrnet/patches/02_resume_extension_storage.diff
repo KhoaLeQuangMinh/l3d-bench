@@ -1,0 +1,231 @@
+diff --git a/adet/layers/csrc/DeformAttn/ms_deform_attn.h b/adet/layers/csrc/DeformAttn/ms_deform_attn.h
+index 25272cd..45ef193 100644
+--- a/adet/layers/csrc/DeformAttn/ms_deform_attn.h
++++ b/adet/layers/csrc/DeformAttn/ms_deform_attn.h
+@@ -26,7 +26,7 @@ ms_deform_attn_forward(
+     const at::Tensor &attn_weight,
+     const int im2col_step)
+ {
+-    if (value.type().is_cuda())
++    if (value.is_cuda())
+     {
+ #ifdef WITH_CUDA
+         return ms_deform_attn_cuda_forward(
+@@ -48,7 +48,7 @@ ms_deform_attn_backward(
+     const at::Tensor &grad_output,
+     const int im2col_step)
+ {
+-    if (value.type().is_cuda())
++    if (value.is_cuda())
+     {
+ #ifdef WITH_CUDA
+         return ms_deform_attn_cuda_backward(
+diff --git a/adet/layers/csrc/DeformAttn/ms_deform_attn_cuda.cu b/adet/layers/csrc/DeformAttn/ms_deform_attn_cuda.cu
+index 951f5d7..af37ca5 100644
+--- a/adet/layers/csrc/DeformAttn/ms_deform_attn_cuda.cu
++++ b/adet/layers/csrc/DeformAttn/ms_deform_attn_cuda.cu
+@@ -31,11 +31,11 @@ at::Tensor ms_deform_attn_cuda_forward(
+     AT_ASSERTM(sampling_loc.is_contiguous(), "sampling_loc tensor has to be contiguous");
+     AT_ASSERTM(attn_weight.is_contiguous(), "attn_weight tensor has to be contiguous");
+ 
+-    AT_ASSERTM(value.type().is_cuda(), "value must be a CUDA tensor");
+-    AT_ASSERTM(spatial_shapes.type().is_cuda(), "spatial_shapes must be a CUDA tensor");
+-    AT_ASSERTM(level_start_index.type().is_cuda(), "level_start_index must be a CUDA tensor");
+-    AT_ASSERTM(sampling_loc.type().is_cuda(), "sampling_loc must be a CUDA tensor");
+-    AT_ASSERTM(attn_weight.type().is_cuda(), "attn_weight must be a CUDA tensor");
++    AT_ASSERTM(value.is_cuda(), "value must be a CUDA tensor");
++    AT_ASSERTM(spatial_shapes.is_cuda(), "spatial_shapes must be a CUDA tensor");
++    AT_ASSERTM(level_start_index.is_cuda(), "level_start_index must be a CUDA tensor");
++    AT_ASSERTM(sampling_loc.is_cuda(), "sampling_loc must be a CUDA tensor");
++    AT_ASSERTM(attn_weight.is_cuda(), "attn_weight must be a CUDA tensor");
+ 
+     const int batch = value.size(0);
+     const int spatial_size = value.size(1);
+@@ -61,15 +61,15 @@ at::Tensor ms_deform_attn_cuda_forward(
+     for (int n = 0; n < batch/im2col_step_; ++n)
+     {
+         auto columns = output_n.select(0, n);
+-        AT_DISPATCH_FLOATING_TYPES(value.type(), "ms_deform_attn_forward_cuda", ([&] {
++        AT_DISPATCH_FLOATING_TYPES(value.scalar_type(), "ms_deform_attn_forward_cuda", ([&] {
+             ms_deformable_im2col_cuda(at::cuda::getCurrentCUDAStream(),
+-                value.data<scalar_t>() + n * im2col_step_ * per_value_size,
+-                spatial_shapes.data<int64_t>(),
+-                level_start_index.data<int64_t>(),
+-                sampling_loc.data<scalar_t>() + n * im2col_step_ * per_sample_loc_size,
+-                attn_weight.data<scalar_t>() + n * im2col_step_ * per_attn_weight_size,
++                value.data_ptr<scalar_t>() + n * im2col_step_ * per_value_size,
++                spatial_shapes.data_ptr<int64_t>(),
++                level_start_index.data_ptr<int64_t>(),
++                sampling_loc.data_ptr<scalar_t>() + n * im2col_step_ * per_sample_loc_size,
++                attn_weight.data_ptr<scalar_t>() + n * im2col_step_ * per_attn_weight_size,
+                 batch_n, spatial_size, num_heads, channels, num_levels, num_query, num_point,
+-                columns.data<scalar_t>());
++                columns.data_ptr<scalar_t>());
+ 
+         }));
+     }
+@@ -97,12 +97,12 @@ std::vector<at::Tensor> ms_deform_attn_cuda_backward(
+     AT_ASSERTM(attn_weight.is_contiguous(), "attn_weight tensor has to be contiguous");
+     AT_ASSERTM(grad_output.is_contiguous(), "grad_output tensor has to be contiguous");
+ 
+-    AT_ASSERTM(value.type().is_cuda(), "value must be a CUDA tensor");
+-    AT_ASSERTM(spatial_shapes.type().is_cuda(), "spatial_shapes must be a CUDA tensor");
+-    AT_ASSERTM(level_start_index.type().is_cuda(), "level_start_index must be a CUDA tensor");
+-    AT_ASSERTM(sampling_loc.type().is_cuda(), "sampling_loc must be a CUDA tensor");
+-    AT_ASSERTM(attn_weight.type().is_cuda(), "attn_weight must be a CUDA tensor");
+-    AT_ASSERTM(grad_output.type().is_cuda(), "grad_output must be a CUDA tensor");
++    AT_ASSERTM(value.is_cuda(), "value must be a CUDA tensor");
++    AT_ASSERTM(spatial_shapes.is_cuda(), "spatial_shapes must be a CUDA tensor");
++    AT_ASSERTM(level_start_index.is_cuda(), "level_start_index must be a CUDA tensor");
++    AT_ASSERTM(sampling_loc.is_cuda(), "sampling_loc must be a CUDA tensor");
++    AT_ASSERTM(attn_weight.is_cuda(), "attn_weight must be a CUDA tensor");
++    AT_ASSERTM(grad_output.is_cuda(), "grad_output must be a CUDA tensor");
+ 
+     const int batch = value.size(0);
+     const int spatial_size = value.size(1);
+@@ -131,18 +131,18 @@ std::vector<at::Tensor> ms_deform_attn_cuda_backward(
+     for (int n = 0; n < batch/im2col_step_; ++n)
+     {
+         auto grad_output_g = grad_output_n.select(0, n);
+-        AT_DISPATCH_FLOATING_TYPES(value.type(), "ms_deform_attn_backward_cuda", ([&] {
++        AT_DISPATCH_FLOATING_TYPES(value.scalar_type(), "ms_deform_attn_backward_cuda", ([&] {
+             ms_deformable_col2im_cuda(at::cuda::getCurrentCUDAStream(),
+-                                    grad_output_g.data<scalar_t>(),
+-                                    value.data<scalar_t>() + n * im2col_step_ * per_value_size,
+-                                    spatial_shapes.data<int64_t>(),
+-                                    level_start_index.data<int64_t>(),
+-                                    sampling_loc.data<scalar_t>() + n * im2col_step_ * per_sample_loc_size,
+-                                    attn_weight.data<scalar_t>() + n * im2col_step_ * per_attn_weight_size,
++                                    grad_output_g.data_ptr<scalar_t>(),
++                                    value.data_ptr<scalar_t>() + n * im2col_step_ * per_value_size,
++                                    spatial_shapes.data_ptr<int64_t>(),
++                                    level_start_index.data_ptr<int64_t>(),
++                                    sampling_loc.data_ptr<scalar_t>() + n * im2col_step_ * per_sample_loc_size,
++                                    attn_weight.data_ptr<scalar_t>() + n * im2col_step_ * per_attn_weight_size,
+                                     batch_n, spatial_size, num_heads, channels, num_levels, num_query, num_point,
+-                                    grad_value.data<scalar_t>() +  n * im2col_step_ * per_value_size,
+-                                    grad_sampling_loc.data<scalar_t>() + n * im2col_step_ * per_sample_loc_size,
+-                                    grad_attn_weight.data<scalar_t>() + n * im2col_step_ * per_attn_weight_size);
++                                    grad_value.data_ptr<scalar_t>() +  n * im2col_step_ * per_value_size,
++                                    grad_sampling_loc.data_ptr<scalar_t>() + n * im2col_step_ * per_sample_loc_size,
++                                    grad_attn_weight.data_ptr<scalar_t>() + n * im2col_step_ * per_attn_weight_size);
+ 
+         }));
+     }
+diff --git a/adet/layers/ms_deform_attn.py b/adet/layers/ms_deform_attn.py
+index 73c569c..02c0c54 100644
+--- a/adet/layers/ms_deform_attn.py
++++ b/adet/layers/ms_deform_attn.py
+@@ -14,7 +14,10 @@ import torch.nn.functional as F
+ from torch.nn.init import xavier_uniform_, constant_
+ from torch.autograd.function import once_differentiable
+ 
+-from adet import _C
++try:
++    from adet import _C
++except ImportError:  # [l3d-bench] extension not built: fall back to the reference PyTorch implementation below
++    _C = None
+ import sys
+ 
+ class _MSDeformAttnFunction(torch.autograd.Function):
+@@ -148,8 +151,11 @@ class MSDeformAttn(nn.Module):
+         else:
+             raise ValueError(
+                 'Last dim of reference_points must be 2 or 4, but get {} instead.'.format(reference_points.shape[-1]))
+-        output = _MSDeformAttnFunction.apply(
+-            value, input_spatial_shapes, input_level_start_index, sampling_locations, attention_weights, self.im2col_step)
++        if _C is not None and value.is_cuda:
++            output = _MSDeformAttnFunction.apply(
++                value, input_spatial_shapes, input_level_start_index, sampling_locations, attention_weights, self.im2col_step)
++        else:  # [l3d-bench] same computation (bilinear sampling, Deformable DETR's reference code), slower
++            output = ms_deform_attn_core_pytorch(value, input_spatial_shapes, sampling_locations, attention_weights)
+         output = self.output_proj(output)
+         # if decoder:
+         #     return output, sampling_locations, attention_weights
+diff --git a/train.py b/train.py
+index 4b7dfa1..c66e51a 100644
+--- a/train.py
++++ b/train.py
+@@ -1,5 +1,8 @@
+ import argparse
+ import os
++import random
++import sys
++import time
+ import torch
+ import cv2
+ import numpy as np
+@@ -42,9 +45,26 @@ def main(args):
+ 
+     optimizer = torch.optim.Adam([{'params': model.parameters()}], lr=1e-5, weight_decay=1e-4)
+ 
++    # [l3d-bench] resume across Kaggle sessions (model, optimizer, epoch, RNG); stop cleanly before the session limit
++    n_epochs = min(args.epoch, int(os.environ.get("L3D_MAX_EPOCHS", args.epoch)))
++    stop_at = float(os.environ.get("L3D_STOP_AT", "inf"))
++    resume_path = os.path.join(args.save_path, "resume.pth")
++    slowest = 0.0
++    if os.path.exists(resume_path):
++        ck = torch.load(resume_path, map_location=device, weights_only=False)
++        model.load_state_dict(ck["model"])
++        optimizer.load_state_dict(ck["optimizer"])
++        start_epoch, slowest = ck["epoch"], ck["slowest"]
++        random.setstate(ck["rng"]["python"]); np.random.set_state(ck["rng"]["numpy"])
++        torch.set_rng_state(ck["rng"]["torch"].cpu())
++        if ck["rng"]["cuda"] is not None and torch.cuda.is_available():
++            torch.cuda.set_rng_state_all([t.cpu() for t in ck["rng"]["cuda"]])
++        print("[l3d-bench] resumed after epoch {}".format(start_epoch))
++
+     sigmoid_weight = lambda e: 1-torch.sigmoid((e-10)/2)
+    
+-    for epoch in range(start_epoch+1, args.epoch+1):
++    for epoch in range(start_epoch+1, n_epochs+1):
++        t_epoch = time.time()
+         loss_weights = {'loss_ce_enc': 1-sigmoid_weight(epoch),
+                         'loss_pos_enc':sigmoid_weight(epoch),
+                         'segmentation_loss': sigmoid_weight(epoch)}
+@@ -58,7 +78,7 @@ def main(args):
+             optimizer.step()
+             pbar.set_postfix({'epoch':epoch,'loss': loss.item()})
+             wandb.log({'epoch':epoch,'loss': loss.item()})
+-        if epoch % 10==0:
++        if epoch % 10==0 or epoch == n_epochs:   # [l3d-bench] also the last epoch (pilot runs stop early)
+             # model.eval()
+             with torch.no_grad():
+                 torch.save({'model': model.state_dict()}, args.save_path + f"/epoch-{epoch}.pt")
+@@ -74,6 +94,20 @@ def main(args):
+                     dices.append(dice)
+                     pbar.set_postfix({'Val_epoch':epoch,'Dice': dice, 'IOU': iou})
+                 wandb.log({'epoch':epoch,'Dice':np.mean(dices),'IOU': np.mean(ious)})
++                print("[l3d-bench] epoch {} val dice (released train-mode validation) {:.4f}".format(epoch, np.mean(dices)))
++
++        # [l3d-bench] resume checkpoint + time guard
++        slowest = max(slowest, time.time() - t_epoch)
++        tmp = resume_path + ".tmp"
++        torch.save({"model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch, "slowest": slowest,
++                    "rng": {"python": random.getstate(), "numpy": np.random.get_state(), "torch": torch.get_rng_state(),
++                            "cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None}}, tmp)
++        os.replace(tmp, resume_path)
++        print("[l3d-bench] epoch {} done ({:.1f} min)".format(epoch, (time.time() - t_epoch) / 60), flush=True)
++        if epoch < n_epochs and time.time() + 1.15 * slowest > stop_at:
++            print("[l3d-bench] session time limit: paused after epoch {}".format(epoch))
++            sys.exit(3)
++    open(os.path.join(args.save_path, "TRAINING_DONE"), "w").write("done\n")
+ 
+ def metrix(results, targets):
+     gt = np.stack([lm['landmark_mask'].cpu().numpy() for lm in targets[0]], -1)
+diff --git a/utils/preprocess.py b/utils/preprocess.py
+index 448cf86..4323fc5 100644
+--- a/utils/preprocess.py
++++ b/utils/preprocess.py
+@@ -55,9 +55,9 @@ def generate_beziers(src_path, dst_path, degree=5, curve_points_num=25, num_clas
+ 
+             gt[lm_idx]['ctrl_points'] = np.stack(lm_ctrl_points, 0) if len(lm_ctrl_points) > 0 else np.empty([0,degree+1,2])
+             gt[lm_idx]['curve_points'] = np.stack(lm_curve_points, 0) if len(lm_ctrl_points) > 0 else np.empty([0,curve_points_num,2])
+-            gt[lm_idx]['landmark_mask'] = landmark_mask
++            gt[lm_idx]['landmark_mask'] = landmark_mask.astype(np.uint8)  # [l3d-bench] 0/1 values, uint8 storage
+ 
+-        np.savez(os.path.join(dst_path, name), gt=gt)
++        np.savez_compressed(os.path.join(dst_path, name), gt=gt)  # [l3d-bench] 50 MB -> ~0.1 MB per frame
+         
+         
+ def resize_images(image_path, target_shape=(1920, 1080)):
