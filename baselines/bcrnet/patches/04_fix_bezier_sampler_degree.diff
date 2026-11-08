@@ -1,0 +1,13 @@
+diff --git a/adet/modeling/bezier_detection.py b/adet/modeling/bezier_detection.py
+index 177ecc3..ee2034f 100644
+--- a/adet/modeling/bezier_detection.py
++++ b/adet/modeling/bezier_detection.py
+@@ -116,7 +116,7 @@ class TransformerPureDetector(nn.Module):
+         pixel_std = torch.Tensor(cfg.MODEL.PIXEL_STD).to(self.device).view(3, 1, 1)
+         self.normalizer = lambda x: (x - pixel_mean) / pixel_std
+         self.to(self.device)
+-        self.bezier_sampler = BezierSampler(num_sample_points=25)
++        self.bezier_sampler = BezierSampler(num_sample_points=25, degree=cfg.MODEL.TRANSFORMER.BEZIER_DEGREE)  # [l3d-bench] default degree 4 vs the model's 5: crash
+ 
+     def preprocess_image(self, batched_inputs):
+         """

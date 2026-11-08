@@ -76,3 +76,16 @@ Data root style: **upper** (`Train/ Val/ Test/`).
 - 03_fix_loss_schedule.diff — `1 - torch.sigmoid((e - 10) / 2)` passes a Python float to torch.sigmoid,
   which raises TypeError in every PyTorch version, so the released train.py stops at epoch 1. Wrapped the
   value in torch.tensor; the schedule is the one written.
+
+## Patch 04
+
+- 04_fix_bezier_sampler_degree.diff — the model predicts degree-5 Bezier proposals (config BEZIER_DEGREE: 5,
+  6 control points) but TransformerPureDetector builds its BezierSampler with the default degree 4. The
+  sampler only runs, in inference(), on proposals scoring above INFERENCE_TH_TEST (0.35), so training
+  crashes as soon as the model gets confident: on Kaggle at step 139 of epoch 1 ("Expected size ... [1, 5]
+  but got: [1, 6]"). The sampled points feed only the visualisation and an unused Chamfer value, never the
+  loss or the predictions we score, so passing degree=BEZIER_DEGREE changes nothing else.
+  Checked on CPU with the score threshold forced to 0 (every query kept): inference in eval and train mode
+  and the export all run.
+- First Kaggle run: adet._C built and matched the PyTorch reference (max abs err 1.4e-14); batch 4 fits a
+  T4 at about 2.55 s/step, 231 steps/epoch (about 10 min/epoch, about 10-11 h for 60 epochs + validation).
