@@ -263,5 +263,6 @@ def test_manifest_ids_valid():
     from l3d_bench.runs.manifest import load_manifest
     m = load_manifest(REPO_ROOT / "runs" / "manifest.csv")
     folds = m[m["split"] != "official"]
-    assert set(folds.loc[folds["method"] != "bcrnet", "commit"]) == {"study-v1"}
-    assert set(folds.loc[folds["method"] == "bcrnet", "commit"]) == {"bcrnet-v1"}   # study-v1 + BCRNet runner
+    ours = folds["method"].isin(["m1", "m2", "m3"])
+    assert set(folds.loc[ours, "commit"]) == {"study-v1"}
+    assert set(folds.loc[~ours, "commit"]) == {"study-v1.1"}   # study-v1 + BCRNet runner + A2ONet scoring fix

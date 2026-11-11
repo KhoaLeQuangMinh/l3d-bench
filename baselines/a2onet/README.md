@@ -12,7 +12,17 @@ selection set. Its metric (a2onet/metrics.py) is our scoring protocol.
 Batch: batch 2 on one T4 runs out of memory (pilot, 3 Nov), so we use the authors' own DDP path on Kaggle's
 two T4s: batch 1 per GPU with SyncBatchNorm, as in the paper (which used 5 GPUs). Global batch 2 instead of 5,
 the same global batch as the README's single-GPU command. L3D_GPUS=1 falls back to one GPU at batch 1. Evaluation every 5 epochs, as released (so selection is among epochs 0, 5, ..., 99).
-Export mirrors test.py (pretrained_resnet=False, fusion alpha 1.0).
+Export mirrors test.py (pretrained_resnet=False), except for the fusion alpha (below).
+
+**Fusion alpha (found 10 Nov, official run).** train.py ramps the curve-mask fusion in: alpha = 0 up to epoch
+10, then +0.1 per epoch, 1.0 from epoch 20, and its every-5-epoch evaluation uses the alpha of that epoch. On
+the official split both best_val_path.pth and best_path.pth are epoch 10 (val 66.12, test 64.97 in its log),
+i.e. from the warm-up, when the fusion branch was switched off. test.py always sets alpha 1.0, so scoring
+these files as released (what our first export did) gave test 62.14 for a checkpoint whose own log says
+64.97: the released code selects and tests the same weights under two different models. We now score each
+checkpoint with the alpha it was selected under ('val', 'native'; recorded in the run card) and keep the
+test.py way as 'val_testpy' (alpha 1.0, held-out only). Both are reported. Also worth reporting: no
+fully-fused epoch (20-99) beat the warm-up epochs on val in this run (best 64.7 at epoch 40 vs 66.1).
 
 Patches (patches/):
 - 01_resume.diff — infrastructure only: resume.pth after every epoch, clean exit (code 3) before Kaggle's time

@@ -141,14 +141,39 @@ class A2ONet(Spec):
                  "--pretrained_dir", str(ctx.weights)], ctx.repo, {})
 
     def checkpoints(self, ctx: Ctx) -> dict:
-        ck = {"val": ctx.run_dir / "best_val_path.pth"}
+        """A2ONet ramps its curve-mask fusion in during training (alpha 0 up to epoch 10, then +0.1 per epoch, 1.0
+        from epoch 20) and evaluates every 5 epochs with the alpha of that epoch, so best_val_path.pth /
+        best_path.pth can come from the warm-up, when the fusion branch was switched off. Its test.py always
+        sets alpha 1.0, i.e. scores such a checkpoint differently from how it was selected. We score each
+        checkpoint with the alpha it was selected under ('val', 'native'), and also the val checkpoint as
+        test.py would ('val_testpy', alpha 1.0, held-out only)."""
+        ck = {"val": ctx.run_dir / "best_val_path.pth", "val_testpy": ctx.run_dir / "best_val_path.pth"}
         if ctx.split == "official":
             ck["native"] = ctx.run_dir / "best_path.pth"
+        self.alphas = {tag: self.selected_alpha(ctx, tag) for tag in ck}
+        self.launch_info = {**(getattr(self, "launch_info", None) or {}), "fusion_alpha": self.alphas}
+        ctx.log(f"A2ONet fusion alpha used for scoring: {self.alphas}")
         return ck
 
+    @staticmethod
+    def fusion_alpha(epoch: int, start: int = 10, warmup: int = 10) -> float:
+        """a2onet/losses.py A2OCriterion.fusion_alpha with its defaults (train.py passes none)."""
+        return 0.0 if epoch < start else float(min(1.0, (epoch - start) / float(warmup)))
+
+    def selected_alpha(self, ctx: Ctx, tag: str) -> float:
+        if tag == "val_testpy":
+            return 1.0
+        import json
+        hist = json.loads((ctx.run_dir / "metrics.json").read_text())
+        key = "test" if tag == "native" else ("val" if hist[0].get("val") else "test")
+        best = max(hist, key=lambda h: (h[key]["dice"], -h["epoch"]))   # train.py keeps the first strict improvement
+        return self.fusion_alpha(int(best["epoch"]))
+
     def export_cmd(self, ctx: Ctx, ckpt: Path, frame_list: Path, out: Path, native: Path):
+        alpha = getattr(self, "alphas", {}).get(ctx.current_tag, 1.0)
         return [sys.executable, self.export_script(), "--model_path", str(ckpt), "--sam", str(self.sam),
-                "--depth", str(self.depth), "--list", str(frame_list), "--out", str(out), "--native_json", str(native)]
+                "--depth", str(self.depth), "--list", str(frame_list), "--out", str(out), "--native_json", str(native),
+                "--alpha", str(alpha)]
 
 
 class D2GPLand(Spec):

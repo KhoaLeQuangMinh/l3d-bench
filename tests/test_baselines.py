@@ -73,3 +73,22 @@ def test_bcrnet_selection_picks_best_then_earliest(index, tmp_path, monkeypatch)
     monkeypatch.setattr(specs, "sh", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no re-scoring")))
     ck = specs.BCRNet().checkpoints(ctx)
     assert ck["val"].name == "epoch-20.pt" and ck["native"].name == "epoch-30.pt"
+
+
+def test_a2onet_scores_each_checkpoint_with_its_selection_alpha(index, tmp_path):
+    import json
+    from l3d_bench.baselines.specs import A2ONet
+    ctx = make_ctx("a2onet", "official", 0, tmp_path / "runs", tmp_path / "w", load_config(), index=index)
+    ctx.run_dir.mkdir(parents=True)
+    r = lambda d: {"dice": d, "iou": 0, "assd": 0}
+    ctx.run_dir.joinpath("metrics.json").write_text(json.dumps([
+        {"epoch": 5, "val": r(0.60), "test": r(0.61)}, {"epoch": 10, "val": r(0.66), "test": r(0.60)},
+        {"epoch": 15, "val": r(0.64), "test": r(0.65)}, {"epoch": 20, "val": r(0.66), "test": r(0.62)}]))
+    spec = A2ONet()
+    ck = spec.checkpoints(ctx)
+    assert set(ck) == {"val", "val_testpy", "native"}
+    assert spec.alphas == {"val": 0.0, "val_testpy": 1.0, "native": 0.5}     # val: epoch 10 (first max); test: 15
+    ctx.current_tag = "native"
+    spec.sam = spec.depth = tmp_path
+    cmd = spec.export_cmd(ctx, ck["native"], tmp_path / "l.txt", tmp_path / "o", tmp_path / "n.json")
+    assert cmd[cmd.index("--alpha") + 1] == "0.5"

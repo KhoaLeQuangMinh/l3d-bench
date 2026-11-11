@@ -23,18 +23,18 @@ m3__posebal__f1__s0,m3,f1,0,acct08,1,study-v1,todo,
 m3__posebal__f2__s0,m3,f2,0,acct09,1,study-v1,todo,
 m3__posebal__f3__s0,m3,f3,0,acct09,1,study-v1,todo,
 m3__posebal__f4__s0,m3,f4,0,acct09,1,study-v1,todo,
-a2onet__official__f0__s0,a2onet,f0,0,acct01,2,study-v1,todo,"T4 x2, ~30 h: one fold per account-week"
-a2onet__official__f1__s0,a2onet,f1,0,acct02,2,study-v1,todo,"T4 x2, ~30 h: one fold per account-week"
-a2onet__official__f2__s0,a2onet,f2,0,acct03,2,study-v1,todo,"T4 x2, ~30 h: one fold per account-week"
-a2onet__official__f3__s0,a2onet,f3,0,acct04,2,study-v1,todo,"T4 x2, ~30 h: one fold per account-week"
-a2onet__official__f4__s0,a2onet,f4,0,acct05,2,study-v1,todo,"T4 x2, ~30 h: one fold per account-week"
-d2gpland__official__f0__s0,d2gpland,f0,0,acct06,2,study-v1,todo,~20 h
-d2gpland__official__f1__s0,d2gpland,f1,0,acct07,2,study-v1,todo,~20 h
-d2gpland__official__f2__s0,d2gpland,f2,0,acct08,2,study-v1,todo,~20 h
-d2gpland__official__f3__s0,d2gpland,f3,0,acct09,2,study-v1,todo,~20 h
-d2gpland__official__f4__s0,d2gpland,f4,0,acct10,2,study-v1,todo,~20 h
-bcrnet__official__f0__s0,bcrnet,f0,0,acct01,3,bcrnet-v1,todo,after the official run works; tag bcrnet-v1 = study-v1 + BCRNet runner
-bcrnet__official__f1__s0,bcrnet,f1,0,acct02,3,bcrnet-v1,todo,after the official run works; tag bcrnet-v1 = study-v1 + BCRNet runner
-bcrnet__official__f2__s0,bcrnet,f2,0,acct03,3,bcrnet-v1,todo,after the official run works; tag bcrnet-v1 = study-v1 + BCRNet runner
-bcrnet__official__f3__s0,bcrnet,f3,0,acct04,3,bcrnet-v1,todo,after the official run works; tag bcrnet-v1 = study-v1 + BCRNet runner
-bcrnet__official__f4__s0,bcrnet,f4,0,acct05,3,bcrnet-v1,todo,after the official run works; tag bcrnet-v1 = study-v1 + BCRNet runner
+a2onet__official__f0__s0,a2onet,f0,0,acct01,2,study-v1.1,todo,"T4 x2, ~30 h: one fold per account-week; sessions from 10 Nov on study-v1.1 (scoring fix only, training unchanged)"
+a2onet__official__f1__s0,a2onet,f1,0,acct02,2,study-v1.1,todo,"T4 x2, ~30 h: one fold per account-week; sessions from 10 Nov on study-v1.1 (scoring fix only, training unchanged)"
+a2onet__official__f2__s0,a2onet,f2,0,acct03,2,study-v1.1,todo,"T4 x2, ~30 h: one fold per account-week; sessions from 10 Nov on study-v1.1 (scoring fix only, training unchanged)"
+a2onet__official__f3__s0,a2onet,f3,0,acct04,2,study-v1.1,todo,"T4 x2, ~30 h: one fold per account-week; sessions from 10 Nov on study-v1.1 (scoring fix only, training unchanged)"
+a2onet__official__f4__s0,a2onet,f4,0,acct05,2,study-v1.1,todo,"T4 x2, ~30 h: one fold per account-week; sessions from 10 Nov on study-v1.1 (scoring fix only, training unchanged)"
+d2gpland__official__f0__s0,d2gpland,f0,0,acct06,2,study-v1.1,todo,"~20 h; sessions from 10 Nov on study-v1.1 (scoring fix only, training unchanged)"
+d2gpland__official__f1__s0,d2gpland,f1,0,acct07,2,study-v1.1,todo,"~20 h; sessions from 10 Nov on study-v1.1 (scoring fix only, training unchanged)"
+d2gpland__official__f2__s0,d2gpland,f2,0,acct08,2,study-v1.1,todo,"~20 h; sessions from 10 Nov on study-v1.1 (scoring fix only, training unchanged)"
+d2gpland__official__f3__s0,d2gpland,f3,0,acct09,2,study-v1.1,todo,"~20 h; sessions from 10 Nov on study-v1.1 (scoring fix only, training unchanged)"
+d2gpland__official__f4__s0,d2gpland,f4,0,acct10,2,study-v1.1,todo,"~20 h; sessions from 10 Nov on study-v1.1 (scoring fix only, training unchanged)"
+bcrnet__official__f0__s0,bcrnet,f0,0,acct01,3,study-v1.1,todo,after the official BCRNet run works
+bcrnet__official__f1__s0,bcrnet,f1,0,acct02,3,study-v1.1,todo,after the official BCRNet run works
+bcrnet__official__f2__s0,bcrnet,f2,0,acct03,3,study-v1.1,todo,after the official BCRNet run works
+bcrnet__official__f3__s0,bcrnet,f3,0,acct04,3,study-v1.1,todo,after the official BCRNet run works
+bcrnet__official__f4__s0,bcrnet,f4,0,acct05,3,study-v1.1,todo,after the official BCRNet run works
